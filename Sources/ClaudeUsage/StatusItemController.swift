@@ -20,7 +20,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         super.init()
 
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: UsagePanel(store: store))
+        let hosting = NSHostingController(rootView: UsagePanel(store: store))
+        // Without this the controller never reports its size, so the popover
+        // keeps AppKit's default 320x320 contentSize: it anchors for a 320-tall
+        // panel, then the window shrinks to fit from the top and leaves a gap
+        // the height of the difference.
+        hosting.sizingOptions = [.preferredContentSize]
+        popover.contentViewController = hosting
         popover.delegate = self
 
         statusItem.button?.target = self
