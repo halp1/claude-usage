@@ -1,0 +1,3 @@
+module ClaudeUsagePackageTests {
+    header "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/include/ClaudeUsagePackageTests-Swift.h"
+}

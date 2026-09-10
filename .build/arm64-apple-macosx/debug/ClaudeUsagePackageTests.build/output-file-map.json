@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsagePackageTests.build/primary.swiftdeps"
+  },
+  "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsagePackageTests.derived/runner.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsagePackageTests.build/runner.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsagePackageTests.build/runner.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsagePackageTests.build/runner~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsagePackageTests.build/runner.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsagePackageTests.build/runner.dia"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "": {
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/primary.swiftdeps"
+  },
+  "/Users/halp/code/claude-usage/Tests/ClaudeUsageCoreTests/CoreTests.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/CoreTests.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/CoreTests.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/CoreTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/CoreTests.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/CoreTests.dia"
+  },
+  "/Users/halp/code/claude-usage/Tests/ClaudeUsageCoreTests/ReadOnlyGuardTests.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/ReadOnlyGuardTests.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/ReadOnlyGuardTests.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/ReadOnlyGuardTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/ReadOnlyGuardTests.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/ReadOnlyGuardTests.dia"
+  },
+  "/Users/halp/code/claude-usage/Tests/ClaudeUsageCoreTests/TokenProviderTests.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/TokenProviderTests.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/TokenProviderTests.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/TokenProviderTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/TokenProviderTests.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCoreTests.build/TokenProviderTests.dia"
+  }
+}

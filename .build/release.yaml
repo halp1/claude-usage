@@ -1,0 +1,153 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "ClaudeUsage-arm64-apple-macosx-release.exe": ["<ClaudeUsage-arm64-apple-macosx-release.exe>"]
+  "ClaudeUsage-arm64-apple-macosx-release.module": ["<ClaudeUsage-arm64-apple-macosx-release.module>"]
+  "ClaudeUsageCore-arm64-apple-macosx-release.module": ["<ClaudeUsageCore-arm64-apple-macosx-release.module>"]
+  "ClaudeUsageCoreTests-arm64-apple-macosx-release.module": ["<ClaudeUsageCoreTests-arm64-apple-macosx-release.module>"]
+  "ClaudeUsagePackageTests-arm64-apple-macosx-release.module": ["<ClaudeUsagePackageTests-arm64-apple-macosx-release.module>"]
+  "ClaudeUsagePackageTests-arm64-apple-macosx-release.test": ["<ClaudeUsagePackageTests-arm64-apple-macosx-release.test>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<ClaudeUsage-arm64-apple-macosx-release.exe>","<ClaudeUsage-arm64-apple-macosx-release.module>","<ClaudeUsageCore-arm64-apple-macosx-release.module>"]
+  "test": ["<ClaudeUsage-arm64-apple-macosx-release.exe>","<ClaudeUsage-arm64-apple-macosx-release.module>","<ClaudeUsageCore-arm64-apple-macosx-release.module>","<ClaudeUsageCoreTests-arm64-apple-macosx-release.module>","<ClaudeUsagePackageTests-arm64-apple-macosx-release.test>"]
+default: "main"
+nodes:
+  "/Users/halp/code/claude-usage/Sources/ClaudeUsage/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/halp/code/claude-usage/Tests/ClaudeUsageCoreTests/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/halp/code/claude-usage/Sources/ClaudeUsage/StatusItemController.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsage/UsagePanel.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsage/UsageStore.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsage/main.swift"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/sources"]
+    description: "Write auxiliary file /Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/sources"
+
+  "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/StatusItemController.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/UsagePanel.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/UsageStore.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/main.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/CredentialRenewer.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Credentials.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Formatting.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/TokenProvider.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/UsageClient.swift.o"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.product/Objects.LinkFileList"
+
+  "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/CredentialRenewer.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/Credentials.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/Formatting.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/TokenProvider.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/UsageClient.swift"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/sources"]
+    description: "Write auxiliary file /Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/sources"
+
+  "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/halp/code/claude-usage/Tests/ClaudeUsageCoreTests/CoreTests.swift","/Users/halp/code/claude-usage/Tests/ClaudeUsageCoreTests/ReadOnlyGuardTests.swift","/Users/halp/code/claude-usage/Tests/ClaudeUsageCoreTests/TokenProviderTests.swift"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/sources"]
+    description: "Write auxiliary file /Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/sources"
+
+  "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.derived/runner.swift"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/sources"]
+    description: "Write auxiliary file /Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/sources"
+
+  "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.derived/runner.swift":
+    tool: test-entry-point-tool
+    inputs: []
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.derived/runner.swift"]
+
+  "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/CredentialRenewer.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Credentials.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Formatting.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/TokenProvider.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/UsageClient.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/CoreTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/ReadOnlyGuardTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/TokenProviderTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/runner.swift.o"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.product/Objects.LinkFileList"
+
+  "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+
+  "<ClaudeUsage-arm64-apple-macosx-release.exe>":
+    tool: phony
+    inputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage"]
+    outputs: ["<ClaudeUsage-arm64-apple-macosx-release.exe>"]
+
+  "<ClaudeUsage-arm64-apple-macosx-release.module>":
+    tool: phony
+    inputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/StatusItemController.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/UsagePanel.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/UsageStore.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/main.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsage.swiftmodule"]
+    outputs: ["<ClaudeUsage-arm64-apple-macosx-release.module>"]
+
+  "<ClaudeUsageCore-arm64-apple-macosx-release.module>":
+    tool: phony
+    inputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/CredentialRenewer.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Credentials.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Formatting.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/TokenProvider.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/UsageClient.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsageCore.swiftmodule"]
+    outputs: ["<ClaudeUsageCore-arm64-apple-macosx-release.module>"]
+
+  "<ClaudeUsageCoreTests-arm64-apple-macosx-release.module>":
+    tool: phony
+    inputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/CoreTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/ReadOnlyGuardTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/TokenProviderTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsageCoreTests.swiftmodule"]
+    outputs: ["<ClaudeUsageCoreTests-arm64-apple-macosx-release.module>"]
+
+  "<ClaudeUsagePackageTests-arm64-apple-macosx-release.module>":
+    tool: phony
+    inputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/runner.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsagePackageTests.swiftmodule"]
+    outputs: ["<ClaudeUsagePackageTests-arm64-apple-macosx-release.module>"]
+
+  "<ClaudeUsagePackageTests-arm64-apple-macosx-release.test>":
+    tool: phony
+    inputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.xctest/Contents/MacOS/ClaudeUsagePackageTests"]
+    outputs: ["<ClaudeUsagePackageTests-arm64-apple-macosx-release.test>"]
+
+  "C.ClaudeUsage-arm64-apple-macosx-release.exe":
+    tool: shell
+    inputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/StatusItemController.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/UsagePanel.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/UsageStore.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/main.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/CredentialRenewer.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Credentials.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Formatting.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/TokenProvider.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/UsageClient.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.product/Objects.LinkFileList"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage"]
+    description: "Linking ./.build/arm64-apple-macosx/release/ClaudeUsage"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release","-o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage","-module-name","ClaudeUsage","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-dead_strip","-Xlinker","-alias","-Xlinker","_ClaudeUsage_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.ClaudeUsage-arm64-apple-macosx-release.module":
+    tool: shell
+    inputs: ["/Users/halp/code/claude-usage/Sources/ClaudeUsage/StatusItemController.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsage/UsagePanel.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsage/UsageStore.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsage/main.swift","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsageCore.swiftmodule","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/sources"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/StatusItemController.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/UsagePanel.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/UsageStore.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/main.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsage.swiftmodule"]
+    description: "Compiling Swift Module 'ClaudeUsage' (4 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","ClaudeUsage","-emit-dependencies","-emit-module","-emit-module-path","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsage.swiftmodule","-output-file-map","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/output-file-map.json","-whole-module-optimization","-num-threads","10","-c","@/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsage.build/sources","-I","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules","-target","arm64-apple-macosx14.0","-whole-module-optimization","-num-threads","10","-serialize-diagnostics","-O","-j10","-DSWIFT_PACKAGE","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","ClaudeUsage_main","-swift-version","6","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","claude_usage"]
+
+  "C.ClaudeUsageCore-arm64-apple-macosx-release.module":
+    tool: shell
+    inputs: ["/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/CredentialRenewer.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/Credentials.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/Formatting.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/TokenProvider.swift","/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/UsageClient.swift","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/sources"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/CredentialRenewer.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Credentials.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Formatting.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/TokenProvider.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/UsageClient.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsageCore.swiftmodule"]
+    description: "Compiling Swift Module 'ClaudeUsageCore' (5 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","ClaudeUsageCore","-emit-dependencies","-emit-module","-emit-module-path","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsageCore.swiftmodule","-output-file-map","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/output-file-map.json","-parse-as-library","-whole-module-optimization","-num-threads","10","-c","@/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/sources","-I","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules","-target","arm64-apple-macosx14.0","-whole-module-optimization","-num-threads","10","-serialize-diagnostics","-O","-j10","-DSWIFT_PACKAGE","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/include/ClaudeUsageCore-Swift.h","-swift-version","6","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","claude_usage"]
+
+  "C.ClaudeUsageCoreTests-arm64-apple-macosx-release.module":
+    tool: shell
+    inputs: ["/Users/halp/code/claude-usage/Tests/ClaudeUsageCoreTests/CoreTests.swift","/Users/halp/code/claude-usage/Tests/ClaudeUsageCoreTests/ReadOnlyGuardTests.swift","/Users/halp/code/claude-usage/Tests/ClaudeUsageCoreTests/TokenProviderTests.swift","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsageCore.swiftmodule","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/sources"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/CoreTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/ReadOnlyGuardTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/TokenProviderTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsageCoreTests.swiftmodule"]
+    description: "Compiling Swift Module 'ClaudeUsageCoreTests' (3 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","ClaudeUsageCoreTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsageCoreTests.swiftmodule","-output-file-map","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/output-file-map.json","-parse-as-library","-whole-module-optimization","-num-threads","10","-c","@/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/sources","-I","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules","-target","arm64-apple-macosx14.0","-whole-module-optimization","-num-threads","10","-serialize-diagnostics","-index-store-path","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/index/store","-O","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j10","-DSWIFT_PACKAGE","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ModuleCache","-parseable-output","-parse-as-library","-swift-version","6","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","claude_usage"]
+
+  "C.ClaudeUsagePackageTests-arm64-apple-macosx-release.module":
+    tool: shell
+    inputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.derived/runner.swift","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsageCoreTests.swiftmodule","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/sources"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/runner.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsagePackageTests.swiftmodule"]
+    description: "Compiling Swift Module 'ClaudeUsagePackageTests' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","ClaudeUsagePackageTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules/ClaudeUsagePackageTests.swiftmodule","-output-file-map","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/output-file-map.json","-parse-as-library","-whole-module-optimization","-num-threads","10","-c","@/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/sources","-I","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/Modules","-target","arm64-apple-macosx14.0","-whole-module-optimization","-num-threads","10","-serialize-diagnostics","-O","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j10","-DSWIFT_PACKAGE","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/include/ClaudeUsagePackageTests-Swift.h","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","claude_usage"]
+
+  "C.ClaudeUsagePackageTests-arm64-apple-macosx-release.test":
+    tool: shell
+    inputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/CredentialRenewer.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Credentials.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/Formatting.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/TokenProvider.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/UsageClient.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/CoreTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/ReadOnlyGuardTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCoreTests.build/TokenProviderTests.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.build/runner.swift.o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.product/Objects.LinkFileList"]
+    outputs: ["/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.xctest/Contents/MacOS/ClaudeUsagePackageTests"]
+    description: "Linking ./.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.xctest/Contents/MacOS/ClaudeUsagePackageTests"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release","-o","/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.xctest/Contents/MacOS/ClaudeUsagePackageTests","-module-name","ClaudeUsagePackageTests","-Xlinker","-no_warn_duplicate_libraries","-Xlinker","-bundle","-Xlinker","-dead_strip","-Xlinker","-rpath","-Xlinker","@loader_path/../../../","@/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsagePackageTests.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/halp/code/claude-usage/Sources/ClaudeUsage/","/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/","/Users/halp/code/claude-usage/Tests/ClaudeUsageCoreTests/","/Users/halp/code/claude-usage/Package.swift","/Users/halp/code/claude-usage/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

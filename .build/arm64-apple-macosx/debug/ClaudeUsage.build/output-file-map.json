@@ -1,0 +1,33 @@
+{
+  "": {
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/primary.swiftdeps"
+  },
+  "/Users/halp/code/claude-usage/Sources/ClaudeUsage/StatusItemController.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/StatusItemController.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/StatusItemController.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/StatusItemController~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/StatusItemController.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/StatusItemController.dia"
+  },
+  "/Users/halp/code/claude-usage/Sources/ClaudeUsage/UsagePanel.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/UsagePanel.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/UsagePanel.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/UsagePanel~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/UsagePanel.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/UsagePanel.dia"
+  },
+  "/Users/halp/code/claude-usage/Sources/ClaudeUsage/UsageStore.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/UsageStore.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/UsageStore.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/UsageStore~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/UsageStore.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/UsageStore.dia"
+  },
+  "/Users/halp/code/claude-usage/Sources/ClaudeUsage/main.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/main.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/main.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/main.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsage.build/main.dia"
+  }
+}

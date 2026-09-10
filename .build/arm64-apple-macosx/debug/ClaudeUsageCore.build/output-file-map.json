@@ -1,0 +1,40 @@
+{
+  "": {
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/primary.swiftdeps"
+  },
+  "/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/CredentialRenewer.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/CredentialRenewer.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/CredentialRenewer.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/CredentialRenewer~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/CredentialRenewer.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/CredentialRenewer.dia"
+  },
+  "/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/Credentials.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/Credentials.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/Credentials.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/Credentials~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/Credentials.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/Credentials.dia"
+  },
+  "/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/Formatting.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/Formatting.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/Formatting.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/Formatting~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/Formatting.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/Formatting.dia"
+  },
+  "/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/TokenProvider.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/TokenProvider.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/TokenProvider.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/TokenProvider~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/TokenProvider.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/TokenProvider.dia"
+  },
+  "/Users/halp/code/claude-usage/Sources/ClaudeUsageCore/UsageClient.swift": {
+    "dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/UsageClient.d",
+    "object": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/UsageClient.swift.o",
+    "swiftmodule": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/UsageClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/UsageClient.swiftdeps",
+    "diagnostics": "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/debug/ClaudeUsageCore.build/UsageClient.dia"
+  }
+}
