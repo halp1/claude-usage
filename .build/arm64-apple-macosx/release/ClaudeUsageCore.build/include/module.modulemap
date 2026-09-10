@@ -1,3 +1,0 @@
-module ClaudeUsageCore {
-    header "/Users/halp/code/claude-usage/.build/arm64-apple-macosx/release/ClaudeUsageCore.build/include/ClaudeUsageCore-Swift.h"
-}
