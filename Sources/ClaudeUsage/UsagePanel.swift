@@ -98,30 +98,14 @@ private struct LimitsView: View {
 private struct AccountSection: View {
     let state: UsageStore.AccountState
     let now: Date
-    let onRemove: () -> Void
-    let onSignIn: () -> Void
-    @State private var confirmingRemoval = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Text(state.title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 8)
-                Menu {
-                    Button("Sign In Again…", action: onSignIn)
-                    Button("Remove Account", role: .destructive) { confirmingRemoval = true }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .accessibilityLabel("Options for \(state.title)")
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-            }
+            Text(state.title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
             if let snapshot = state.snapshot {
                 LimitsView(snapshot: snapshot, now: now)
                     .opacity(state.isStale ? 0.55 : 1)
@@ -132,9 +116,6 @@ private struct AccountSection: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-        }
-        .confirmationDialog("Remove \(state.title)?", isPresented: $confirmingRemoval) {
-            Button("Remove", role: .destructive, action: onRemove)
         }
     }
 }
@@ -170,12 +151,7 @@ struct UsagePanel: View {
             }
 
             ForEach(store.accounts) { state in
-                AccountSection(
-                    state: state,
-                    now: store.now,
-                    onRemove: { store.remove(state) },
-                    onSignIn: { store.signIn() }
-                )
+                AccountSection(state: state, now: store.now)
                 if state.id != store.accounts.last?.id {
                     Divider()
                 }
@@ -196,11 +172,11 @@ struct UsagePanel: View {
             Divider()
 
             HStack(spacing: 8) {
-                Button(store.isSigningIn ? "Waiting for browser…" : (store.accounts.isEmpty ? "Sign In…" : "Add Account…")) {
-                    store.signIn()
+                if store.accounts.isEmpty || store.isSigningIn {
+                    Button(store.isSigningIn ? "Waiting for browser…" : "Sign In…") { store.signIn() }
+                        .font(.system(size: 12))
+                        .disabled(store.isSigningIn)
                 }
-                .font(.system(size: 12))
-                .disabled(store.isSigningIn)
                 if store.isSigningIn {
                     Button("Cancel") { store.cancelSignIn() }
                         .buttonStyle(.plain)
@@ -245,10 +221,6 @@ struct UsagePanel: View {
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .disabled(store.isRefreshing)
-                Button("Quit") { NSApplication.shared.terminate(nil) }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
             }
         }
     }

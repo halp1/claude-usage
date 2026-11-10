@@ -30,7 +30,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.delegate = self
 
         statusItem.button?.target = self
-        statusItem.button?.action = #selector(togglePopover)
+        statusItem.button?.action = #selector(handleClick)
+        // Right-click opens the account menu instead of the panel.
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
 
         renderTitle()
         observeStore()
@@ -111,9 +113,75 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         }
     }
 
+    // MARK: - Clicks
+
+    @objc private func handleClick() {
+        let event = NSApp.currentEvent
+        let wantsMenu = event?.type == .rightMouseUp
+            || (event?.type == .leftMouseUp && event?.modifierFlags.contains(.control) == true)
+        if wantsMenu {
+            showMenu()
+        } else {
+            togglePopover()
+        }
+    }
+
+    // MARK: - Menu
+
+    /// Built per click so the account list is always current.
+    private func showMenu() {
+        guard let button = statusItem.button else { return }
+        if popover.isShown { popover.performClose(nil) }
+
+        let menu = NSMenu()
+        let add = NSMenuItem(
+            title: store.isSigningIn ? "Waiting for Browser…" : (store.accounts.isEmpty ? "Sign In…" : "Add Account…"),
+            action: store.isSigningIn ? nil : #selector(addAccount),
+            keyEquivalent: ""
+        )
+        add.target = self
+        menu.addItem(add)
+
+        if !store.accounts.isEmpty {
+            menu.addItem(.separator())
+            for state in store.accounts {
+                let remove = NSMenuItem(title: "Remove \(state.title)", action: #selector(removeAccount(_:)), keyEquivalent: "")
+                remove.target = self
+                remove.representedObject = state.id
+                menu.addItem(remove)
+            }
+        }
+
+        menu.addItem(.separator())
+        let quit = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(quit)
+
+        // Pop up under the item, as the system's own status menus do.
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 5), in: button)
+    }
+
+    @objc private func addAccount() {
+        store.signIn()
+    }
+
+    @objc private func removeAccount(_ sender: NSMenuItem) {
+        guard let key = sender.representedObject as? String,
+              let state = store.accounts.first(where: { $0.id == key })
+        else { return }
+        let alert = NSAlert()
+        alert.messageText = "Remove \(state.title)?"
+        alert.informativeText = "Its usage stops showing. Sign in again to add it back."
+        alert.addButton(withTitle: "Remove")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons.first?.hasDestructiveAction = true
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        store.remove(state)
+    }
+
     // MARK: - Popover
 
-    @objc private func togglePopover() {
+    private func togglePopover() {
         if popover.isShown {
             popover.performClose(nil)
         } else if let button = statusItem.button {
