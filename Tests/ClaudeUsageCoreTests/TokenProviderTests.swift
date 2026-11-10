@@ -118,6 +118,16 @@ private func account(_ key: String, email: String? = nil, expiresIn: TimeInterva
     #expect(store.accounts.first { $0.key == "Me@Example.com" }?.grant.refreshToken == "y-rt")
 }
 
+@Test func aSignInClearsAnExpiredUnlabeledGrant() async throws {
+    let store = FakeAccounts([account("halp", expiresIn: -10, signInEndsIn: -1, order: 1)])
+    let oauth = FakeOAuth()
+    let provider = TokenProvider(store: store, refresher: oauth, profiles: oauth)
+    let fresh = AppGrant(accessToken: "new-at", refreshToken: "new-rt", expiresAt: Date().addingTimeInterval(3600))
+
+    try await provider.add(grant: fresh, profile: AccountProfile(email: "me@example.com", organization: nil))
+    #expect(store.accounts.map(\.key) == ["me@example.com"])
+}
+
 @Test func unlabeledGrantsGetTheirEmail() async throws {
     let store = FakeAccounts([account("halp", order: 1)])
     let oauth = FakeOAuth(owners: ["halp-at": "me@example.com"])

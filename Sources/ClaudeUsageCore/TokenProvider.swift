@@ -60,9 +60,16 @@ public actor TokenProvider {
         // A sign-in to that same login supersedes it.
         if let profile {
             for legacy in existing where legacy.email == nil {
-                if let owner = try? await profiles.profile(accessToken: accessToken(for: legacy.key)),
-                   owner.email.lowercased() == profile.email.lowercased() {
+                do {
+                    let owner = try await profiles.profile(accessToken: accessToken(for: legacy.key))
+                    if owner.email.lowercased() == profile.email.lowercased() {
+                        try store.remove(key: legacy.key)
+                    }
+                } catch TokenError.signInExpired {
+                    // Dead and unidentifiable: it can only ever show an error.
                     try store.remove(key: legacy.key)
+                } catch {
+                    // Unreachable right now; leave it for the next sign-in.
                 }
             }
         }
