@@ -156,8 +156,14 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         let quit = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
 
-        // Pop up under the item, as the system's own status menus do.
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 5), in: button)
+        // Attach the menu only for this click and let the status item open it,
+        // so macOS places it under the menu bar like its own status menus.
+        // Popping it up at a computed point put it partly off screen. The
+        // click blocks while the menu tracks, so detaching afterwards is safe
+        // and left-clicks keep opening the panel.
+        statusItem.menu = menu
+        button.performClick(nil)
+        statusItem.menu = nil
     }
 
     @objc private func addAccount() {
