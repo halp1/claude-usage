@@ -217,7 +217,7 @@ struct UsagePanel: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 0)
-                Button("Refresh") { store.refresh() }
+                Button("Refresh") { store.refresh(.manual) }
                     .buttonStyle(.plain)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)

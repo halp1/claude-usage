@@ -145,7 +145,7 @@ func severityThresholdsAreSeventyFiveAndNinety(percent: Double, expected: Severi
 
 // MARK: - When to fetch
 
-@Test func openingThePanelFetchesOnlyFailedAccountsAndNothingCoolsDownEarly() {
+@Test func openingThePanelFetchesOnlyFailedAccountsAndOnlyRefreshSkipsTheCooldown() {
     let now = Date(timeIntervalSince1970: 10_000)
     typealias S = FetchPolicy.State
     let fresh = S(hasSnapshot: true, failed: false, coolingUntil: nil)
@@ -163,6 +163,8 @@ func severityThresholdsAreSeventyFiveAndNinety(percent: Double, expected: Severi
         (cooling, .scheduled, false),
         (cooled, .panelOpened, true),
         (fresh, .scheduled, true),
+        (cooling, .manual, true),
+        (fresh, .manual, true),
     ]
     for (state, trigger, expected) in cases {
         #expect(FetchPolicy.shouldFetch(state, trigger: trigger, now: now) == expected, "\(String(describing: state)) \(trigger)")

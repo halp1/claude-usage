@@ -82,10 +82,12 @@ extension UsageClient {
 /// closed freely without tripping the usage endpoint's rate limit.
 public enum FetchPolicy {
     public enum Trigger: Sendable {
-        /// The timer, waking from sleep, or the Refresh button.
+        /// The timer or waking from sleep.
         case scheduled
         /// The panel opening: fetch only accounts whose last fetch failed.
         case panelOpened
+        /// The Refresh button: fetch every account, even one cooling down.
+        case manual
     }
 
     /// How long to leave an account alone after a 429 without `Retry-After`.
@@ -107,9 +109,10 @@ public enum FetchPolicy {
     /// - Returns: whether to fetch this account now.
     public static func shouldFetch(_ state: State?, trigger: Trigger, now: Date = Date()) -> Bool {
         guard let state else { return true }
+        if trigger == .manual { return true }
         if let until = state.coolingUntil, until > now { return false }
         switch trigger {
-        case .scheduled: return true
+        case .scheduled, .manual: return true
         case .panelOpened: return state.failed || !state.hasSnapshot
         }
     }
