@@ -43,15 +43,15 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private func renderTitle() {
         guard let button = statusItem.button else { return }
 
-        guard let snapshot = store.snapshot else {
+        guard let snapshot = store.combined else {
             button.attributedTitle = NSAttributedString(
-                string: store.lastError == nil ? "…" : "—",
+                string: store.headlineError == nil ? "…" : "—",
                 attributes: [
                     .font: Self.titleFont,
                     .foregroundColor: NSColor.labelColor.withAlphaComponent(0.5),
                 ]
             )
-            button.toolTip = store.lastError ?? "Loading Claude usage…"
+            button.toolTip = store.headlineError ?? "Loading Claude usage…"
             return
         }
 
@@ -84,14 +84,14 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         append(snapshot.weekly)
         button.attributedTitle = title
 
-        var tooltip = "Claude Code usage"
+        var tooltip = store.accounts.count > 1 ? "Claude usage · \(store.accounts.count) accounts combined" : "Claude usage"
         if let fiveHour = snapshot.fiveHour {
             tooltip += "\n5-hour: " + Format.detail(percent: fiveHour.percent, resetsAt: fiveHour.resetsAt, now: store.now)
         }
         if let weekly = snapshot.weekly {
             tooltip += "\nWeekly: " + Format.detail(percent: weekly.percent, resetsAt: weekly.resetsAt, now: store.now)
         }
-        if let error = store.lastError {
+        if let error = store.headlineError {
             tooltip += "\n\n\(error)"
         }
         button.toolTip = tooltip
@@ -100,7 +100,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// Re-registers after each change; observation tracking is single-shot.
     private func observeStore() {
         withObservationTracking {
-            _ = store.snapshot
+            _ = store.accounts
             _ = store.lastError
             _ = store.now
         } onChange: {

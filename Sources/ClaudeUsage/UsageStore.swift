@@ -3,23 +3,48 @@ import ClaudeUsageCore
 import Observation
 import ServiceManagement
 
-/// Owns the polling loop and the last known good numbers.
+/// Owns the polling loop and the last known good numbers for every account.
 ///
-/// A failed fetch never clears `snapshot`: the bar keeps showing the last real
-/// values and marks them stale, which is more useful than blanking on a blip.
+/// A failed fetch never clears an account's numbers: the panel keeps showing
+/// its last real values and marks them stale, which is more useful than
+/// blanking on a blip.
 @MainActor
 @Observable
 final class UsageStore {
-    private(set) var snapshot: UsageSnapshot?
+    /// One entry per signed-in account, in sign-in order.
+    private(set) var accounts: [AccountState] = []
+    /// Set when nothing could be listed at all, such as no accounts yet.
     private(set) var lastError: String?
     private(set) var isRefreshing = false
 
     /// Recomputed on every tick so countdowns stay live without extra fetches.
     private(set) var now = Date()
 
-    var isStale: Bool { lastError != nil && snapshot != nil }
+    struct AccountState: Identifiable, Equatable {
+        let account: Account
+        /// Last successful numbers, kept across failed fetches.
+        var snapshot: UsageSnapshot?
+        /// Why the latest fetch failed, if it did.
+        var error: String?
 
-    private let client: UsageClient
+        var id: String { account.key }
+        var title: String { account.email ?? "Claude account" }
+        var isStale: Bool { error != nil && snapshot != nil }
+    }
+
+    /// What the menu bar shows: every account's numbers pooled together.
+    var combined: UsageSnapshot? {
+        UsageSnapshot.combined(accounts.compactMap(\.snapshot))
+    }
+
+    var isStale: Bool { accounts.contains { $0.error != nil } && combined != nil }
+
+    /// An error worth surfacing on the menu bar item.
+    var headlineError: String? {
+        lastError ?? accounts.first(where: { $0.error != nil }).map { "\($0.title): \($0.error ?? "")" }
+    }
+
+    let client: UsageClient
     private let interval: TimeInterval
     private var timer: Timer?
 
@@ -47,7 +72,11 @@ final class UsageStore {
             Task { @MainActor in self?.refresh() }
         }
 
-        refresh()
+        Task {
+            // Label grants older versions saved without an email.
+            await client.tokens.identifyUnlabeled()
+            refresh()
+        }
     }
 
     func refresh() {
@@ -58,39 +87,61 @@ final class UsageStore {
         Task {
             defer { isRefreshing = false }
             do {
-                snapshot = try await client.fetch()
+                let results = try await client.fetchAll()
+                let previous = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+                accounts = results.map { result in
+                    AccountState(
+                        account: result.account,
+                        snapshot: result.snapshot ?? previous[result.account.key]?.snapshot,
+                        error: result.error
+                    )
+                }
                 lastError = nil
             } catch {
+                if case TokenError.signInRequired = error { accounts = [] }
                 lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             }
-            hasOwnGrant = await client.tokens.hasOwnGrant()
             now = Date()
         }
     }
 
-    // MARK: - Sign-in
+    // MARK: - Accounts
 
-    /// Whether the app holds its own grant. Without one it borrows Claude
-    /// Code's token, which stops working whenever that token expires.
-    private(set) var hasOwnGrant = true
     private(set) var isSigningIn = false
     private(set) var signInError: String?
+    private var signInTask: Task<Void, Never>?
 
-    /// Opens the browser to sign in and give the app its own grant.
+    /// Opens the browser to sign in. Signing in to an account already listed
+    /// renews it; any other account is added.
     func signIn() {
         guard !isSigningIn else { return }
         isSigningIn = true
         signInError = nil
-        Task {
-            defer { isSigningIn = false }
+        signInTask = Task {
+            defer { isSigningIn = false; signInTask = nil }
             do {
-                _ = try await SignIn().run { url in
+                _ = try await SignIn(tokens: client.tokens).run { url in
                     DispatchQueue.main.async { NSWorkspace.shared.open(url) }
                 }
-                hasOwnGrant = true
                 refresh()
             } catch is CancellationError {
                 // Nothing to report.
+            } catch {
+                signInError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            }
+        }
+    }
+
+    func cancelSignIn() {
+        signInTask?.cancel()
+    }
+
+    func remove(_ state: AccountState) {
+        Task {
+            do {
+                try await client.tokens.remove(key: state.account.key)
+                accounts.removeAll { $0.id == state.id }
+                refresh()
             } catch {
                 signInError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             }

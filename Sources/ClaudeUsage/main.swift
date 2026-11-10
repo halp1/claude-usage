@@ -17,65 +17,68 @@ if CommandLine.arguments.contains("--login-status") {
     exit(0)
 }
 
-if CommandLine.arguments.contains("--sign-in") {
-    // Same browser sign-in as the panel's button, for use from a terminal.
+/// Runs async work from top-level code and exits non-zero on failure.
+/// Detached on purpose: top-level code is `@MainActor`, so a plain `Task`
+/// would inherit main-actor isolation and deadlock against `wait()`.
+func runToCompletion(_ label: String, _ body: @escaping @Sendable () async throws -> Void) -> Never {
     let outcome = ProbeOutcome()
     let done = DispatchSemaphore(value: 0)
     Task.detached {
         defer { done.signal() }
-        do {
-            _ = try await SignIn().run { url in
-                print("Opening the browser to sign in. If it does not open, visit:\n\(url)")
-                NSWorkspace.shared.open(url)
-            }
-            print("signed in; the app now renews its own sign-in")
-        } catch {
-            outcome.error = error
-        }
+        do { try await body() } catch { outcome.error = error }
     }
     done.wait()
     if let error = outcome.error {
         let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        FileHandle.standardError.write(Data("sign-in failed: \(message)\n".utf8))
+        FileHandle.standardError.write(Data("\(label) failed: \(message)\n".utf8))
         exit(1)
     }
     exit(0)
 }
 
-if CommandLine.arguments.contains("--probe") {
-    let outcome = ProbeOutcome()
-    let done = DispatchSemaphore(value: 0)
+if CommandLine.arguments.contains("--sign-in") {
+    // Same browser sign-in as the panel's button, for use from a terminal.
+    runToCompletion("sign-in") {
+        let account = try await SignIn(tokens: TokenProvider()).run { url in
+            print("Opening the browser to sign in. If it does not open, visit:\n\(url)")
+            NSWorkspace.shared.open(url)
+        }
+        print("signed in as \(account.email ?? account.key)")
+    }
+}
 
-    // Detached on purpose: top-level code is `@MainActor`, so a plain `Task`
-    // would inherit main-actor isolation and deadlock against `wait()` below.
-    Task.detached {
-        defer { done.signal() }
-        do {
-            let client = UsageClient()
-            let snapshot = try await client.fetch()
-            print("source  : \(await client.tokens.hasOwnGrant() ? "own sign-in (self-renewing)" : "borrowed from Claude Code (read-only)")")
-            func show(_ label: String, _ window: LimitWindow?) {
-                guard let window else { print("\(label): (absent)"); return }
-                print("\(label): \(Format.detail(percent: window.percent, resetsAt: window.resetsAt))")
-            }
+if CommandLine.arguments.contains("--probe") {
+    // The whole data path (keychain, tokens, HTTP, decode) without the GUI.
+    runToCompletion("probe") {
+        let client = UsageClient()
+        await client.tokens.identifyUnlabeled()
+        let results = try await client.fetchAll()
+        func show(_ label: String, _ window: LimitWindow?) {
+            guard let window else { print("  \(label): (absent)"); return }
+            print("  \(label): \(Format.detail(percent: window.percent, resetsAt: window.resetsAt))")
+        }
+        func show(_ snapshot: UsageSnapshot) {
             show("5-hour  ", snapshot.fiveHour)
             show("weekly  ", snapshot.weekly)
             if let credits = snapshot.credits {
                 let cap = credits.percent.map { Format.percent($0) } ?? "unlimited"
-                print("credits : \(Format.money(credits.used, currency: credits.currency)) (\(cap))")
+                print("  credits : \(Format.money(credits.used, currency: credits.currency)) (\(cap))")
             }
-        } catch {
-            outcome.error = error
+        }
+        for result in results {
+            let org = result.account.organization.map { " (\($0))" } ?? ""
+            print("\(result.account.email ?? result.account.key)\(org)")
+            if let snapshot = result.snapshot { show(snapshot) }
+            if let error = result.error { print("  error   : \(error)") }
+            if let ends = result.account.grant.refreshExpiresAt {
+                print("  sign-in : valid until \(ends.formatted(date: .abbreviated, time: .shortened))")
+            }
+        }
+        if results.count > 1, let combined = UsageSnapshot.combined(results.compactMap(\.snapshot)) {
+            print("combined")
+            show(combined)
         }
     }
-
-    done.wait()
-    if let error = outcome.error {
-        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        FileHandle.standardError.write(Data("probe failed: \(message)\n".utf8))
-        exit(1)
-    }
-    exit(0)
 }
 
 @MainActor
