@@ -52,7 +52,7 @@ public struct UsageClient: Sendable {
     public static let endpoint = URL(string: "https://api.anthropic.com/api/oauth/usage")!
     static let userAgent = "ClaudeUsage-MenuBar/1.0"
 
-    private let tokens: TokenProvider
+    public let tokens: TokenProvider
     private let session: URLSession
 
     public init(tokens: TokenProvider = TokenProvider(), session: URLSession = .shared) {
@@ -64,8 +64,8 @@ public struct UsageClient: Sendable {
         do {
             return try await fetch(forceRenewal: false)
         } catch UsageError.unauthorized {
-            // The stored expiry can lag reality (revocation, clock skew, a token
-            // Claude Code rotated). Ask the CLI to renew, then try once more.
+            // The stored expiry can lag reality (revocation, clock skew). Renew
+            // the app's own grant, then try once more.
             return try await fetch(forceRenewal: true)
         }
     }
@@ -152,7 +152,7 @@ public enum UsageError: Error, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .unauthorized:
-            return "Sign-in expired. Run `claude` and sign in again."
+            return "Sign-in expired. Sign in again."
         case .requestFailed(let status) where status == 0:
             return "No response from the usage service."
         case .requestFailed(let status):

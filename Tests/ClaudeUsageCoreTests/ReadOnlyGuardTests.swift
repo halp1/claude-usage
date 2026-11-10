@@ -1,51 +1,72 @@
 import Foundation
 import Testing
+@testable import ClaudeUsageCore
 
 /// Guards the invariant this project violated once, at real cost.
 ///
-/// Refresh tokens are single-use: renewing the shared `Claude Code-credentials`
+/// Refresh tokens are single-use: renewing Claude Code's `Claude Code-credentials`
 /// grant invalidates the refresh token a running Claude Code holds in memory,
 /// which logs the user out and puts `/login` into a loop that only deleting the
-/// keychain item breaks. Reading that item is safe; writing it or refreshing
-/// against it is not, at any interval, with any locking.
+/// keychain item breaks.
 ///
-/// This app therefore reads and never writes. If a future change reaches for a
-/// keychain write or a token refresh, this test fails and explains why.
-@Test func sourcesNeverWriteTheSharedCredentialItem() throws {
-    // Tests/ClaudeUsageCoreTests/ReadOnlyGuardTests.swift → repository root
-    let root = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-    let sources = root.appendingPathComponent("Sources")
+/// The app may renew only its own grant (`AppGrant`, created by its own browser
+/// sign-in and stored under a different keychain service). These tests fail if
+/// a change could let Claude Code's grant be written or renewed.
 
-    let forbidden = [
-        "SecItemUpdate": "writes the shared keychain item",
-        "SecItemAdd": "writes the shared keychain item",
-        "SecItemDelete": "destroys the shared keychain item",
-        "grant_type": "performs an OAuth token exchange",
-        "refresh_token": "rotates the shared refresh token",
-    ]
+private let sourcesRoot: URL = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .appendingPathComponent("Sources")
 
-    let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)?
+private func sources() throws -> [(name: String, text: String)] {
+    let files = FileManager.default.enumerator(at: sourcesRoot, includingPropertiesForKeys: nil)?
         .compactMap { $0 as? URL }
         .filter { $0.pathExtension == "swift" } ?? []
-    #expect(!files.isEmpty, "found no Swift sources to scan; check the path math above")
+    return try files.map { ($0.lastPathComponent, try String(contentsOf: $0, encoding: .utf8)) }
+}
 
-    for file in files {
-        let contents = try String(contentsOf: file, encoding: .utf8)
-        for (token, reason) in forbidden {
-            #expect(
-                !contents.contains(token),
-                """
-                \(file.lastPathComponent) contains \(token), which \(reason).
-                The menu bar app must only read Claude Code's credentials. \
-                Renewing that grant rotates the refresh token and logs the user \
-                out of Claude Code. To survive token expiry, use a separate \
-                credential from `claude setup-token` in this app's own keychain \
-                item instead.
-                """
-            )
+@Test func nothingWritesAKeychainItemThroughTheSecurityFramework() throws {
+    let all = try sources()
+    #expect(!all.isEmpty, "found no Swift sources to scan; check the path math above")
+    for (name, text) in all {
+        for token in ["SecItemUpdate", "SecItemAdd", "SecItemDelete", "SecKeychainItemModify"] {
+            #expect(!text.contains(token), "\(name) contains \(token); the app must not write keychain items directly")
         }
     }
+}
+
+@Test func tokenExchangeLivesOnlyInTheAppGrantClient() throws {
+    // `ClaudeOAuth` only accepts an `AppGrant`, which is never built from
+    // Claude Code's item. Keep every token exchange in that one file.
+    for (name, text) in try sources() where name != "ClaudeOAuth.swift" {
+        for token in ["grant_type", "refresh_token", "oauth/token"] {
+            #expect(!text.contains(token), "\(name) contains \(token); token exchange belongs in ClaudeOAuth.swift only")
+        }
+    }
+}
+
+@Test func claudeCodesItemIsOnlyEverRead() throws {
+    for (name, text) in try sources() {
+        if name == "Credentials.swift" {
+            // The reader must not pull the refresh token out at all.
+            #expect(!text.contains("[\"refreshToken\"]"), "Credentials.swift reads Claude Code's refresh token")
+            #expect(!text.contains("add-generic-password") && !text.contains("delete-generic-password"))
+        } else {
+            #expect(!text.contains("Claude Code-credentials"), "\(name) names Claude Code's keychain item")
+            #expect(!text.contains("OAuthCredentials.service"), "\(name) addresses Claude Code's keychain item")
+        }
+    }
+}
+
+@Test func appGrantUsesItsOwnKeychainItem() {
+    #expect(KeychainAppGrantStore.service != OAuthCredentials.service)
+}
+
+@Test func claudeCodeCredentialsCarryNoRefreshToken() throws {
+    let blob = #"{"claudeAiOauth":{"accessToken":"a","refreshToken":"SECRET","expiresAt":1789017599542}}"#
+    let credentials = try OAuthCredentials(json: Data(blob.utf8))
+    let labels = Mirror(reflecting: credentials).children.compactMap(\.label)
+    #expect(labels.sorted() == ["accessToken", "expiresAt"])
+    #expect(!String(describing: credentials).contains("SECRET"))
 }

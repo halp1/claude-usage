@@ -97,6 +97,11 @@ struct UsagePanel: View {
             launchAtLogin = store.launchesAtLogin
             store.refresh()
         }
+        // `snapshot` is assigned only when a fetch succeeds, so its `fetchedAt`
+        // changes exactly once per successful refresh and never on a failed one.
+        .onChange(of: store.snapshot?.fetchedAt) {
+            launchError = nil
+        }
     }
 
     @ViewBuilder
@@ -123,6 +128,23 @@ struct UsagePanel: View {
 
             if store.isStale, let error = store.lastError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !store.hasOwnGrant {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Sign in so usage keeps updating without opening Claude Code.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(store.isSigningIn ? "Waiting for browser…" : "Sign In…") { store.signIn() }
+                        .font(.system(size: 12))
+                        .disabled(store.isSigningIn)
+                }
+            }
+            if let signInError = store.signInError {
+                Text(signInError)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

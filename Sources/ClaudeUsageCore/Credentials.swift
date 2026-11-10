@@ -1,35 +1,24 @@
 import Foundation
-import Security
 
-/// The OAuth credential blob Claude Code stores in the login keychain.
+/// The parts of Claude Code's stored login this app is allowed to see.
 ///
-/// The keychain item holds a JSON document we do not fully own, so the raw
-/// dictionaries are retained verbatim and only the three token fields are
-/// rewritten. Anything Claude Code adds survives a round trip untouched.
+/// Claude Code's keychain item also holds its refresh token. This type does not
+/// read it, on purpose: refresh tokens are single-use, and rotating Claude
+/// Code's once logged Claude Code out into a `/login` loop. With no refresh
+/// token in memory, nothing in this app can renew Claude Code's grant, even by
+/// mistake. The app renews only its own grant (`AppGrant`).
 public struct OAuthCredentials: Sendable {
     public static let service = "Claude Code-credentials"
     /// Claude Code nests the tokens under this key.
     static let oauthKey = "claudeAiOauth"
 
-    public var accessToken: String
-    public var refreshToken: String
-    public var expiresAt: Date
+    public let accessToken: String
+    public let expiresAt: Date
 
-    /// The document exactly as it was read, kept as bytes so this type stays
-    /// `Sendable`; it is re-parsed only when writing back.
-    private var envelopeData: Data?
-    /// Whether the tokens were nested under `claudeAiOauth` or stored flat.
-    private var isNested: Bool
-
-    public init(accessToken: String, refreshToken: String, expiresAt: Date) {
+    public init(accessToken: String, expiresAt: Date) {
         self.accessToken = accessToken
-        self.refreshToken = refreshToken
         self.expiresAt = expiresAt
-        self.envelopeData = nil
-        self.isNested = true
     }
-
-    public var isExpired: Bool { expiresAt <= Date() }
 
     /// True when the token is gone or close enough to expiry that a request
     /// started now could outlive it.
@@ -37,77 +26,50 @@ public struct OAuthCredentials: Sendable {
         expiresAt.timeIntervalSince(now) <= leeway
     }
 
-    // MARK: - JSON
-
     public init(json data: Data) throws {
-        guard let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw CredentialsError.malformed("credential blob is not a JSON object")
         }
-        let nested = envelope[Self.oauthKey] as? [String: Any]
-        let fields = nested ?? envelope
+        let fields = (envelope[Self.oauthKey] as? [String: Any]) ?? envelope
 
         guard let accessToken = fields["accessToken"] as? String, !accessToken.isEmpty else {
             throw CredentialsError.malformed("no accessToken in credential blob")
-        }
-        guard let refreshToken = fields["refreshToken"] as? String, !refreshToken.isEmpty else {
-            throw CredentialsError.malformed("no refreshToken in credential blob")
         }
         // Claude Code writes epoch milliseconds.
         guard let expiresAtMillis = fields["expiresAt"] as? Double else {
             throw CredentialsError.malformed("no expiresAt in credential blob")
         }
-
         self.accessToken = accessToken
-        self.refreshToken = refreshToken
         self.expiresAt = Date(timeIntervalSince1970: expiresAtMillis / 1000)
-        self.envelopeData = data
-        self.isNested = nested != nil
-    }
-
-    /// Re-serializes the original document with only the token fields replaced.
-    public func jsonData() throws -> Data {
-        var envelope = envelopeData
-            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
-        var fields = (isNested ? envelope[Self.oauthKey] as? [String: Any] : envelope) ?? [:]
-
-        fields["accessToken"] = accessToken
-        fields["refreshToken"] = refreshToken
-        fields["expiresAt"] = (expiresAt.timeIntervalSince1970 * 1000).rounded()
-
-        if isNested {
-            envelope[Self.oauthKey] = fields
-        } else {
-            envelope = fields
-        }
-        return try JSONSerialization.data(withJSONObject: envelope, options: [.sortedKeys])
     }
 }
 
 public enum CredentialsError: Error, LocalizedError {
     case notFound
     case malformed(String)
-    case keychain(OSStatus)
+    /// `/usr/bin/security` exited non-zero. It reports only the low byte of the
+    /// OSStatus, so the raw exit code is kept as-is.
+    case securityTool(Int32)
 
     public var errorDescription: String? {
         switch self {
         case .notFound:
-            return "No Claude Code credentials in the keychain. Run `claude` and sign in."
+            return "No Claude Code credentials in the keychain. Sign in to Claude Usage instead."
         case .malformed(let detail):
             return "Could not read Claude Code credentials: \(detail)."
-        case .keychain(let status):
-            let message = SecCopyErrorMessageString(status, nil) as String? ?? "OSStatus \(status)"
-            return "Keychain error: \(message)"
+        case .securityTool(let code):
+            return "Keychain read failed (security exited with \(code)). Is the login keychain locked?"
         }
     }
 }
 
-/// Reads the credential item. Protocol-backed so tests can exercise token
-/// logic without touching the real keychain. This store is read-only on
-/// purpose: writing back rotates Claude Code's OAuth grant and logs it out.
+/// Reads Claude Code's credential item. Read-only on purpose; see `OAuthCredentials`.
 public protocol CredentialStore: Sendable {
     func load() throws -> OAuthCredentials
 }
 
+/// Reads the item through `/usr/bin/security`; see `SecurityTool` for why that
+/// avoids the recurring keychain password prompt.
 public struct KeychainCredentialStore: CredentialStore {
     private let account: String
 
@@ -115,29 +77,21 @@ public struct KeychainCredentialStore: CredentialStore {
         self.account = account
     }
 
-    private var baseQuery: [String: Any] {
-        [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: OAuthCredentials.service,
-            kSecAttrAccount as String: account,
-        ]
-    }
-
     public func load() throws -> OAuthCredentials {
-        var query = baseQuery
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        switch status {
-        case errSecSuccess:
-            guard let data = item as? Data else { throw CredentialsError.malformed("empty keychain item") }
-            return try OAuthCredentials(json: data)
-        case errSecItemNotFound:
+        let output: SecurityTool.Output
+        do {
+            output = try SecurityTool.run(["find-generic-password", "-s", OAuthCredentials.service, "-a", account, "-w"])
+        } catch {
+            throw CredentialsError.malformed("could not run \(SecurityTool.path): \(error.localizedDescription)")
+        }
+        switch output.status {
+        case 0:
+            guard !output.text.isEmpty else { throw CredentialsError.malformed("empty keychain item") }
+            return try OAuthCredentials(json: Data(output.text.utf8))
+        case SecurityTool.itemNotFoundExitCode:
             throw CredentialsError.notFound
         default:
-            throw CredentialsError.keychain(status)
+            throw CredentialsError.securityTool(output.status)
         }
     }
 }

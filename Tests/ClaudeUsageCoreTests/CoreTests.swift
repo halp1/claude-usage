@@ -23,37 +23,12 @@ private let sampleCredentialJSON = """
 @Test func parsesNestedCredentials() throws {
     let credentials = try OAuthCredentials(json: Data(sampleCredentialJSON.utf8))
     #expect(credentials.accessToken == "access-1")
-    #expect(credentials.refreshToken == "refresh-1")
     #expect(credentials.expiresAt == Date(timeIntervalSince1970: 1789017599.542))
-}
-
-@Test func writeBackPreservesEverythingWeDoNotOwn() throws {
-    var credentials = try OAuthCredentials(json: Data(sampleCredentialJSON.utf8))
-    credentials.accessToken = "access-2"
-    credentials.refreshToken = "refresh-2"
-    credentials.expiresAt = Date(timeIntervalSince1970: 1800000000)
-
-    let round = try JSONSerialization.jsonObject(with: credentials.jsonData()) as! [String: Any]
-    let oauth = round["claudeAiOauth"] as! [String: Any]
-
-    #expect(oauth["accessToken"] as? String == "access-2")
-    #expect(oauth["refreshToken"] as? String == "refresh-2")
-    #expect(oauth["expiresAt"] as? Double == 1800000000000)
-    // Fields Claude Code owns must survive untouched.
-    #expect(oauth["subscriptionType"] as? String == "team")
-    #expect(oauth["rateLimitTier"] as? String == "default_raven")
-    #expect(oauth["refreshTokenExpiresAt"] as? Double == 1790000000000)
-    #expect((oauth["scopes"] as? [String])?.count == 2)
-    #expect((round["someOtherKey"] as? [String: Any])?["nested"] as? Bool == true)
 }
 
 @Test func acceptsFlatCredentialsWithoutTheOAuthWrapper() throws {
     let flat = #"{"accessToken":"a","refreshToken":"r","expiresAt":1789017599542}"#
-    var credentials = try OAuthCredentials(json: Data(flat.utf8))
-    credentials.accessToken = "b"
-    let round = try JSONSerialization.jsonObject(with: credentials.jsonData()) as! [String: Any]
-    #expect(round["accessToken"] as? String == "b")
-    #expect(round["claudeAiOauth"] == nil)
+    #expect(try OAuthCredentials(json: Data(flat.utf8)).accessToken == "a")
 }
 
 @Test func rejectsBlobWithoutTokens() {
@@ -65,7 +40,7 @@ private let sampleCredentialJSON = """
 @Test func refreshIsDueOnlyInsideTheLeeway() {
     let now = Date()
     func credentials(expiringIn seconds: TimeInterval) -> OAuthCredentials {
-        OAuthCredentials(accessToken: "a", refreshToken: "r", expiresAt: now.addingTimeInterval(seconds))
+        OAuthCredentials(accessToken: "a", expiresAt: now.addingTimeInterval(seconds))
     }
     #expect(credentials(expiringIn: 3600).needsRefresh(now: now) == false)
     #expect(credentials(expiringIn: 61).needsRefresh(now: now) == false)

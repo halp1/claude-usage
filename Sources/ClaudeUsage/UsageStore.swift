@@ -23,7 +23,7 @@ final class UsageStore {
     private let interval: TimeInterval
     private var timer: Timer?
 
-    init(client: UsageClient = UsageClient(), interval: TimeInterval = 60) {
+    init(client: UsageClient = UsageClient(), interval: TimeInterval = 120) {
         self.client = client
         self.interval = interval
     }
@@ -63,7 +63,37 @@ final class UsageStore {
             } catch {
                 lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             }
+            hasOwnGrant = await client.tokens.hasOwnGrant()
             now = Date()
+        }
+    }
+
+    // MARK: - Sign-in
+
+    /// Whether the app holds its own grant. Without one it borrows Claude
+    /// Code's token, which stops working whenever that token expires.
+    private(set) var hasOwnGrant = true
+    private(set) var isSigningIn = false
+    private(set) var signInError: String?
+
+    /// Opens the browser to sign in and give the app its own grant.
+    func signIn() {
+        guard !isSigningIn else { return }
+        isSigningIn = true
+        signInError = nil
+        Task {
+            defer { isSigningIn = false }
+            do {
+                _ = try await SignIn().run { url in
+                    DispatchQueue.main.async { NSWorkspace.shared.open(url) }
+                }
+                hasOwnGrant = true
+                refresh()
+            } catch is CancellationError {
+                // Nothing to report.
+            } catch {
+                signInError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            }
         }
     }
 

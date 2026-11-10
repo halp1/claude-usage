@@ -2,101 +2,140 @@ import Foundation
 import Testing
 @testable import ClaudeUsageCore
 
-/// An in-memory stand-in for the keychain. Records writes so tests can assert
-/// the provider never performs one.
-private final class FakeStore: CredentialStore, @unchecked Sendable {
-    var credentials: OAuthCredentials
+/// Claude Code's item, read-only. Counts reads; it has no write path to count.
+private final class FakeClaudeCode: CredentialStore, @unchecked Sendable {
+    var credentials: OAuthCredentials?
     private(set) var loadCount = 0
-    private(set) var saveCount = 0
 
-    init(expiresIn seconds: TimeInterval, accessToken: String = "initial") {
-        credentials = OAuthCredentials(
-            accessToken: accessToken,
-            refreshToken: "refresh",
-            expiresAt: Date().addingTimeInterval(seconds)
-        )
+    init(expiresIn seconds: TimeInterval?, accessToken: String = "borrowed") {
+        credentials = seconds.map { OAuthCredentials(accessToken: accessToken, expiresAt: Date().addingTimeInterval($0)) }
     }
 
     func load() throws -> OAuthCredentials {
         loadCount += 1
+        guard let credentials else { throw CredentialsError.notFound }
         return credentials
     }
+}
 
-    func save(_ credentials: OAuthCredentials) throws {
-        saveCount += 1
-        self.credentials = credentials
+private final class FakeGrants: AppGrantStoring, @unchecked Sendable {
+    var grant: AppGrant?
+    private(set) var saveCount = 0
+
+    init(_ grant: AppGrant? = nil) { self.grant = grant }
+
+    func load() throws -> AppGrant? { grant }
+    func save(_ grant: AppGrant) throws { saveCount += 1; self.grant = grant }
+    func clear() throws { grant = nil }
+}
+
+private final class FakeRefresher: GrantRefreshing, @unchecked Sendable {
+    private(set) var refreshed: [String] = []
+    var reject = false
+
+    func refresh(_ grant: AppGrant) async throws -> AppGrant {
+        refreshed.append(grant.refreshToken)
+        try await Task.sleep(for: .milliseconds(20))
+        if reject { throw OAuthError.grantRejected }
+        return AppGrant(accessToken: "renewed", refreshToken: "rotated", expiresAt: Date().addingTimeInterval(3600))
     }
 }
 
-/// Stands in for the Claude Code CLI, optionally simulating a successful renewal.
-private final class FakeRenewer: CredentialRenewing, @unchecked Sendable {
-    private(set) var renewCount = 0
-    private let onRenew: (@Sendable () -> Void)?
-
-    init(onRenew: (@Sendable () -> Void)? = nil) {
-        self.onRenew = onRenew
-    }
-
-    func renew() async {
-        renewCount += 1
-        onRenew?()
-    }
+private func grant(expiresIn seconds: TimeInterval) -> AppGrant {
+    AppGrant(accessToken: "own", refreshToken: "own-refresh", expiresAt: Date().addingTimeInterval(seconds))
 }
 
-@Test func usesTheStoredTokenAndDoesNotInvokeTheCLIWhenItIsFresh() async throws {
-    let store = FakeStore(expiresIn: 3600)
-    let renewer = FakeRenewer()
-    let provider = TokenProvider(store: store, renewer: renewer)
+@Test func usesTheOwnGrantWithoutTouchingClaudeCode() async throws {
+    let claude = FakeClaudeCode(expiresIn: 3600)
+    let refresher = FakeRefresher()
+    let provider = TokenProvider(claudeCode: claude, grants: FakeGrants(grant(expiresIn: 3600)), refresher: refresher)
 
-    #expect(try await provider.accessToken() == "initial")
-    // Renewal is the expensive, sensitive path: it must stay untouched here.
-    #expect(renewer.renewCount == 0)
-    #expect(store.saveCount == 0)
+    #expect(try await provider.accessToken() == "own")
+    #expect(claude.loadCount == 0)
+    #expect(refresher.refreshed.isEmpty)
 }
 
-@Test func asksTheCLIToRenewThenRereadsWhenTheTokenHasExpired() async throws {
-    let store = FakeStore(expiresIn: -10)
-    let renewer = FakeRenewer()
-    // Simulate Claude Code rewriting the keychain during `auth status`.
-    let provider = TokenProvider(store: store, renewer: FakeRenewer {
-        store.credentials = OAuthCredentials(
-            accessToken: "renewed",
-            refreshToken: "rotated",
-            expiresAt: Date().addingTimeInterval(3600)
-        )
-    })
+@Test func renewsTheOwnGrantWhenItExpiresAndSavesTheRotatedToken() async throws {
+    let grants = FakeGrants(grant(expiresIn: -10))
+    let refresher = FakeRefresher()
+    let provider = TokenProvider(claudeCode: FakeClaudeCode(expiresIn: nil), grants: grants, refresher: refresher)
 
     #expect(try await provider.accessToken() == "renewed")
-    // The app itself must never write the shared item; only the CLI does.
-    #expect(store.saveCount == 0)
-    _ = renewer
+    #expect(refresher.refreshed == ["own-refresh"])
+    #expect(grants.grant?.refreshToken == "rotated")
 }
 
-@Test func reportsExpiryWhenTheCLICouldNotRenew() async {
-    let store = FakeStore(expiresIn: -10)
-    let renewer = FakeRenewer()
-    let provider = TokenProvider(store: store, renewer: renewer)
+@Test func concurrentCallersShareOneRenewal() async throws {
+    // A single-use refresh token must be spent exactly once.
+    let grants = FakeGrants(grant(expiresIn: -10))
+    let refresher = FakeRefresher()
+    let provider = TokenProvider(claudeCode: FakeClaudeCode(expiresIn: nil), grants: grants, refresher: refresher)
 
-    await #expect(throws: TokenError.self) {
+    async let a = provider.accessToken()
+    async let b = provider.accessToken()
+    async let c = provider.accessToken(forceRenewal: true)
+    _ = try await (a, b, c)
+    #expect(refresher.refreshed == ["own-refresh"])
+    #expect(grants.saveCount == 1)
+}
+
+@Test func borrowsClaudeCodesTokenOnlyWhileItIsValid() async throws {
+    let refresher = FakeRefresher()
+    let provider = TokenProvider(claudeCode: FakeClaudeCode(expiresIn: 3600), grants: FakeGrants(), refresher: refresher)
+    #expect(try await provider.accessToken() == "borrowed")
+    #expect(refresher.refreshed.isEmpty)
+}
+
+@Test func expiredClaudeCodeTokenAsksForSignInAndIsNeverRenewed() async {
+    let refresher = FakeRefresher()
+    let provider = TokenProvider(claudeCode: FakeClaudeCode(expiresIn: -10), grants: FakeGrants(), refresher: refresher)
+
+    await #expect(throws: TokenError.signInRequired) {
         _ = try await provider.accessToken()
     }
-    #expect(renewer.renewCount == 1)
-    #expect(store.saveCount == 0)
+    await #expect(throws: TokenError.signInRequired) {
+        _ = try await provider.accessToken(forceRenewal: true)
+    }
+    // The only refresher in the app was never called for Claude Code's login.
+    #expect(refresher.refreshed.isEmpty)
 }
 
-@Test func forcedRenewalRunsEvenWhileTheStoredTokenLooksValid() async throws {
-    let store = FakeStore(expiresIn: 3600)
-    let renewer = FakeRenewer()
-    let provider = TokenProvider(store: store, renewer: renewer)
-
-    // Recovery path after a 401 the expiry timestamp did not predict.
-    _ = try await provider.accessToken(forceRenewal: true)
-    #expect(renewer.renewCount == 1)
-    #expect(store.saveCount == 0)
+@Test func rejectedOwnGrantFallsBackToAValidBorrowedToken() async throws {
+    let refresher = FakeRefresher()
+    refresher.reject = true
+    let provider = TokenProvider(
+        claudeCode: FakeClaudeCode(expiresIn: 3600),
+        grants: FakeGrants(grant(expiresIn: -10)),
+        refresher: refresher
+    )
+    #expect(try await provider.accessToken() == "borrowed")
 }
 
-@Test func locatesTheClaudeExecutable() {
-    // The renewal path is inert without this; a missing CLI degrades to stale
-    // values rather than failing loudly, so assert it resolves on this machine.
-    #expect(ClaudeCLIRenewer.executableURL() != nil)
+@Test func parsesATokenResponseAndKeepsTheOldRefreshTokenIfNoneIsReturned() throws {
+    let now = Date(timeIntervalSince1970: 1_000_000)
+    let rotated = try ClaudeOAuth.parseGrant(
+        Data(#"{"access_token":"a","refresh_token":"r2","expires_in":28800}"#.utf8),
+        previousRefreshToken: "r1", now: now
+    )
+    #expect(rotated == AppGrant(accessToken: "a", refreshToken: "r2", expiresAt: now.addingTimeInterval(28800)))
+
+    let kept = try ClaudeOAuth.parseGrant(
+        Data(#"{"access_token":"a","expires_in":60}"#.utf8),
+        previousRefreshToken: "r1", now: now
+    )
+    #expect(kept.refreshToken == "r1")
+}
+
+@Test func pkceChallengeIsBase64URLSHA256() {
+    // Expected value computed independently with Python's hashlib.
+    #expect(PKCE.challenge(for: "dBjftJeZ4CVP-mJ92K9mlQo7Y1vDB2fLQ0ZL0Iv5U0E") == "u_oFNzlVM7I7dTfOzb4DXJIxq6M668Lg4FpmaWZ-9Kg")
+}
+
+@Test func authorizationURLMatchesDSHsKnownGoodRequest() {
+    let url = ClaudeOAuth().authorizationURL(challenge: "c", state: "s", redirectURI: SignIn.redirectURI)
+    let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+    #expect(items.first { $0.name == "scope" }?.value
+        == "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload")
+    #expect(PKCE.randomURLSafe().count == 43)
+    #expect(items.first { $0.name == "redirect_uri" }?.value == "http://localhost:53692/callback")
 }

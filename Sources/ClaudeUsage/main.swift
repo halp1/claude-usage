@@ -17,6 +17,31 @@ if CommandLine.arguments.contains("--login-status") {
     exit(0)
 }
 
+if CommandLine.arguments.contains("--sign-in") {
+    // Same browser sign-in as the panel's button, for use from a terminal.
+    let outcome = ProbeOutcome()
+    let done = DispatchSemaphore(value: 0)
+    Task.detached {
+        defer { done.signal() }
+        do {
+            _ = try await SignIn().run { url in
+                print("Opening the browser to sign in. If it does not open, visit:\n\(url)")
+                NSWorkspace.shared.open(url)
+            }
+            print("signed in; the app now renews its own sign-in")
+        } catch {
+            outcome.error = error
+        }
+    }
+    done.wait()
+    if let error = outcome.error {
+        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        FileHandle.standardError.write(Data("sign-in failed: \(message)\n".utf8))
+        exit(1)
+    }
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--probe") {
     let outcome = ProbeOutcome()
     let done = DispatchSemaphore(value: 0)
@@ -26,7 +51,9 @@ if CommandLine.arguments.contains("--probe") {
     Task.detached {
         defer { done.signal() }
         do {
-            let snapshot = try await UsageClient().fetch()
+            let client = UsageClient()
+            let snapshot = try await client.fetch()
+            print("source  : \(await client.tokens.hasOwnGrant() ? "own sign-in (self-renewing)" : "borrowed from Claude Code (read-only)")")
             func show(_ label: String, _ window: LimitWindow?) {
                 guard let window else { print("\(label): (absent)"); return }
                 print("\(label): \(Format.detail(percent: window.percent, resetsAt: window.resetsAt))")
