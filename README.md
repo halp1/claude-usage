@@ -8,7 +8,8 @@ accounts, refreshed every two minutes.
 ```
 
 Click for the detail panel: each limit with a meter and reset countdown, extra
-usage credits, a launch-at-login toggle, and Quit.
+usage credits, and a launch-at-login toggle. Right-click for **Add Account…**,
+**Remove** for each account, and **Quit** (⌘Q).
 
 Bars and menu bar numbers turn amber at 75% and red at 90%.
 
@@ -37,15 +38,15 @@ account and prints the values, so the app can be checked without the GUI.
 
 Click **Sign In…** in the panel (or run `ClaudeUsage --sign-in`). It opens
 claude.ai in the browser and gives the app its own login, independent of Claude
-Code, which it renews by itself. Click **Add Account…** to sign in another
-account: switch accounts in the browser first, or sign-in just renews the one
-already listed.
+Code, which it renews by itself. To sign in another account, right-click the
+menu bar item and choose **Add Account…**: switch accounts in the browser first,
+or sign-in just renews the one already listed. To renew an expired account, add
+it again.
 
 With one account the panel looks as before. With two or more, the menu bar shows
 them combined and the panel lists **All accounts** first, then each account's
 own limits. Combined means one pool: each window's percentage is the average of
-the accounts' percentages, and it resets when the soonest account resets. Each
-account's menu has **Sign In Again…** and **Remove Account**.
+the accounts' percentages, and it resets when the soonest account resets.
 
 A Claude sign-in lasts about 30 days no matter how often it renews. When one
 runs out, only that account shows a sign-in error, and the others keep updating.
