@@ -142,3 +142,40 @@ func severityThresholdsAreSeventyFiveAndNinety(percent: Double, expected: Severi
     #expect(UsageSnapshot.combined([a]) == a)
     #expect(UsageSnapshot.combined([]) == nil)
 }
+
+// MARK: - When to fetch
+
+@Test func openingThePanelFetchesOnlyFailedAccountsAndNothingCoolsDownEarly() {
+    let now = Date(timeIntervalSince1970: 10_000)
+    typealias S = FetchPolicy.State
+    let fresh = S(hasSnapshot: true, failed: false, coolingUntil: nil)
+    let failed = S(hasSnapshot: true, failed: true, coolingUntil: nil)
+    let cooling = S(hasSnapshot: true, failed: true, coolingUntil: now.addingTimeInterval(30))
+    let cooled = S(hasSnapshot: true, failed: true, coolingUntil: now.addingTimeInterval(-1))
+    let empty = S(hasSnapshot: false, failed: false, coolingUntil: nil)
+
+    let cases: [(S?, FetchPolicy.Trigger, Bool)] = [
+        (fresh, .panelOpened, false),
+        (failed, .panelOpened, true),
+        (empty, .panelOpened, true),
+        (nil, .panelOpened, true),
+        (cooling, .panelOpened, false),
+        (cooling, .scheduled, false),
+        (cooled, .panelOpened, true),
+        (fresh, .scheduled, true),
+    ]
+    for (state, trigger, expected) in cases {
+        #expect(FetchPolicy.shouldFetch(state, trigger: trigger, now: now) == expected, "\(String(describing: state)) \(trigger)")
+    }
+}
+
+@Test func aRateLimitCoolsDownUntilTheServersTime() {
+    let now = Date(timeIntervalSince1970: 10_000)
+    #expect(UsageClient.retryAfter("90", now: now) == now.addingTimeInterval(90))
+    #expect(UsageClient.retryAfter("Wed, 21 Oct 2026 07:28:00 GMT") == Date(timeIntervalSince1970: 1_792_567_680))
+    #expect(UsageClient.retryAfter(nil) == nil)
+
+    #expect(FetchPolicy.cooldown(after: .failure("429", retryAfter: now.addingTimeInterval(90)), now: now) == now.addingTimeInterval(90))
+    #expect(FetchPolicy.cooldown(after: .failure("429", retryAfter: now), now: now) == now.addingTimeInterval(10), "a past or zero wait still pauses briefly")
+    #expect(FetchPolicy.cooldown(after: .failure("offline"), now: now) == nil)
+}

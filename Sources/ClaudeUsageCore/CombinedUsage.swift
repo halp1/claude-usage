@@ -4,7 +4,10 @@ import Foundation
 public struct AccountUsage: Equatable, Sendable, Identifiable {
     public enum Result: Equatable, Sendable {
         case success(UsageSnapshot)
-        case failure(String)
+        /// `retryAfter` is set for a 429, when the server said when to retry.
+        case failure(String, retryAfter: Date? = nil)
+        /// Not fetched this time; the caller keeps what it had.
+        case skipped
     }
 
     public let account: Account
@@ -18,7 +21,7 @@ public struct AccountUsage: Equatable, Sendable, Identifiable {
     }
 
     public var error: String? {
-        if case .failure(let message) = result { return message }
+        if case .failure(let message, _) = result { return message }
         return nil
     }
 
@@ -72,5 +75,49 @@ extension UsageSnapshot {
 extension UsageClient {
     static func message(for error: Error) -> String {
         (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+    }
+}
+
+/// Decides which accounts a refresh fetches, so the panel can be opened and
+/// closed freely without tripping the usage endpoint's rate limit.
+public enum FetchPolicy {
+    public enum Trigger: Sendable {
+        /// The timer, waking from sleep, or the Refresh button.
+        case scheduled
+        /// The panel opening: fetch only accounts whose last fetch failed.
+        case panelOpened
+    }
+
+    /// How long to leave an account alone after a 429 without `Retry-After`.
+    public static let rateLimitBackoff: TimeInterval = 120
+
+    public struct State: Sendable {
+        public var hasSnapshot: Bool
+        public var failed: Bool
+        /// No request before this, whatever triggered the refresh.
+        public var coolingUntil: Date?
+
+        public init(hasSnapshot: Bool, failed: Bool, coolingUntil: Date?) {
+            self.hasSnapshot = hasSnapshot
+            self.failed = failed
+            self.coolingUntil = coolingUntil
+        }
+    }
+
+    /// - Returns: whether to fetch this account now.
+    public static func shouldFetch(_ state: State?, trigger: Trigger, now: Date = Date()) -> Bool {
+        guard let state else { return true }
+        if let until = state.coolingUntil, until > now { return false }
+        switch trigger {
+        case .scheduled: return true
+        case .panelOpened: return state.failed || !state.hasSnapshot
+        }
+    }
+
+    /// When an account may be asked again after a failed fetch.
+    public static func cooldown(after result: AccountUsage.Result, now: Date = Date()) -> Date? {
+        guard case .failure(_, let retryAfter) = result else { return nil }
+        guard let retryAfter else { return nil }
+        return max(retryAfter, now.addingTimeInterval(10))
     }
 }

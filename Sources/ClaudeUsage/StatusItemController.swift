@@ -191,7 +191,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else if let button = statusItem.button {
-            store.refresh()
+            store.refresh(.panelOpened)
             // An accessory app is not active, so its popover would open behind
             // the frontmost app and immediately dismiss itself. Activate first,
             // then take key focus so `.transient` tracks clicks correctly.

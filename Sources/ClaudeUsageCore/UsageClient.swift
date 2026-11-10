@@ -62,16 +62,27 @@ public struct UsageClient: Sendable {
 
     /// Usage for every signed-in account, fetched in parallel. One account
     /// failing never hides the others.
-    public func fetchAll() async throws -> [AccountUsage] {
+    /// - Parameter skipping: account keys not to fetch this time. They come
+    ///   back as `.skipped`, so the caller keeps its last numbers. Any account
+    ///   not listed, including one just added, is fetched.
+    public func fetchAll(skipping: Set<String> = []) async throws -> [AccountUsage] {
         let accounts = try await tokens.accounts()
         guard !accounts.isEmpty else { throw TokenError.signInRequired }
         return await withTaskGroup(of: (Int, AccountUsage).self) { group in
             for (index, account) in accounts.enumerated() {
+                if skipping.contains(account.key) {
+                    group.addTask { (index, AccountUsage(account: account, result: .skipped)) }
+                    continue
+                }
                 group.addTask {
                     do {
                         return (index, AccountUsage(account: account, result: .success(try await fetch(account: account.key))))
                     } catch {
-                        return (index, AccountUsage(account: account, result: .failure(Self.message(for: error))))
+                        // A 429 always cools down: until the server's time, or a fixed backoff.
+                        let retryAfter: Date? = if case UsageError.rateLimited(let until) = error {
+                            until ?? Date().addingTimeInterval(FetchPolicy.rateLimitBackoff)
+                        } else { nil }
+                        return (index, AccountUsage(account: account, result: .failure(Self.message(for: error), retryAfter: retryAfter)))
                     }
                 }
             }
@@ -108,10 +119,24 @@ public struct UsageClient: Sendable {
         if http.statusCode == 401 || http.statusCode == 403 {
             throw UsageError.unauthorized
         }
+        if http.statusCode == 429 {
+            throw UsageError.rateLimited(until: Self.retryAfter(http.value(forHTTPHeaderField: "Retry-After")))
+        }
         guard (200..<300).contains(http.statusCode) else {
             throw UsageError.requestFailed(status: http.statusCode)
         }
         return try Self.parse(data)
+    }
+
+    /// Reads `Retry-After` as seconds or an HTTP date.
+    static func retryAfter(_ header: String?, now: Date = Date()) -> Date? {
+        guard let header = header?.trimmingCharacters(in: .whitespaces), !header.isEmpty else { return nil }
+        if let seconds = Double(header), seconds >= 0 { return now.addingTimeInterval(seconds) }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return formatter.date(from: header)
     }
 
     /// Hand-rolled because most fields in this payload are nullable and several
@@ -167,6 +192,8 @@ public struct UsageClient: Sendable {
 
 public enum UsageError: Error, LocalizedError {
     case unauthorized
+    /// HTTP 429. `until` is when the server said to try again, if it said.
+    case rateLimited(until: Date?)
     case requestFailed(status: Int)
     case malformedResponse
 
@@ -174,6 +201,8 @@ public enum UsageError: Error, LocalizedError {
         switch self {
         case .unauthorized:
             return "Sign-in expired. Sign in again."
+        case .rateLimited:
+            return "Too many requests. Retrying shortly."
         case .requestFailed(let status) where status == 0:
             return "No response from the usage service."
         case .requestFailed(let status):

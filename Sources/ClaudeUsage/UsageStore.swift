@@ -26,6 +26,8 @@ final class UsageStore {
         var snapshot: UsageSnapshot?
         /// Why the latest fetch failed, if it did.
         var error: String?
+        /// After a 429, no request for this account before this time.
+        var coolingUntil: Date?
 
         var id: String { account.key }
         var title: String { account.email ?? "Claude account" }
@@ -79,21 +81,40 @@ final class UsageStore {
         }
     }
 
-    func refresh() {
+    /// - Parameter trigger: `.panelOpened` fetches only accounts whose last
+    ///   fetch failed. Accounts cooling down after a 429 are skipped either way.
+    func refresh(_ trigger: FetchPolicy.Trigger = .scheduled) {
         now = Date()
         guard !isRefreshing else { return }
+
+        let previous = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+        let skipping = Set(accounts.filter { state in
+            !FetchPolicy.shouldFetch(
+                FetchPolicy.State(hasSnapshot: state.snapshot != nil, failed: state.error != nil, coolingUntil: state.coolingUntil),
+                trigger: trigger
+            )
+        }.map(\.id))
+        // Nothing due. A panel opened right after a sign-in still lists the
+        // new account, so only skip the round trip when the listing is current.
+        if !accounts.isEmpty, skipping.count == accounts.count, trigger == .panelOpened, lastError == nil {
+            return
+        }
         isRefreshing = true
 
         Task {
             defer { isRefreshing = false }
             do {
-                let results = try await client.fetchAll()
-                let previous = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+                let results = try await client.fetchAll(skipping: skipping)
                 accounts = results.map { result in
-                    AccountState(
+                    let old = previous[result.account.key]
+                    if case .skipped = result.result {
+                        return AccountState(account: result.account, snapshot: old?.snapshot, error: old?.error, coolingUntil: old?.coolingUntil)
+                    }
+                    return AccountState(
                         account: result.account,
-                        snapshot: result.snapshot ?? previous[result.account.key]?.snapshot,
-                        error: result.error
+                        snapshot: result.snapshot ?? old?.snapshot,
+                        error: result.error,
+                        coolingUntil: FetchPolicy.cooldown(after: result.result)
                     )
                 }
                 lastError = nil

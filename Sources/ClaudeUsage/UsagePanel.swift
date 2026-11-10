@@ -162,8 +162,9 @@ struct UsagePanel: View {
         .padding(16)
         .frame(width: 300)
         .onAppear {
+            // The status item already refreshed on open; a second call here
+            // doubled every open's requests.
             launchAtLogin = store.launchesAtLogin
-            store.refresh()
         }
     }
 
