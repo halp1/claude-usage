@@ -5,7 +5,7 @@ import Network
 ///
 /// Standard OAuth PKCE with a loopback redirect: open the authorize page, catch
 /// the redirect on localhost, exchange the code. The result is a grant only this
-/// app holds, so renewing it later cannot affect Claude Code.
+/// app holds, so renewing it later cannot affect any other program.
 public struct SignIn: Sendable {
     /// The loopback redirect DSH uses with the same client.
     static let port: NWEndpoint.Port = 53692
@@ -13,16 +13,18 @@ public struct SignIn: Sendable {
     static let timeout: Duration = .seconds(300)
 
     private let oauth: ClaudeOAuth
-    private let store: AppGrantStoring
+    private let tokens: TokenProvider
 
-    public init(oauth: ClaudeOAuth = ClaudeOAuth(), store: AppGrantStoring = KeychainAppGrantStore()) {
+    public init(oauth: ClaudeOAuth = ClaudeOAuth(), tokens: TokenProvider) {
         self.oauth = oauth
-        self.store = store
+        self.tokens = tokens
     }
 
+    /// Signs in one account and stores it. Signing in to an account the app
+    /// already has renews that account instead of adding a duplicate.
     /// - Parameter open: shows the authorize URL to the user, normally by
     ///   opening the default browser.
-    public func run(open: @Sendable (URL) -> Void) async throws -> AppGrant {
+    public func run(open: @Sendable (URL) -> Void) async throws -> Account {
         let verifier = PKCE.randomURLSafe()
         // Same length as the verifier, as in DSH's known-good request; a
         // separate value so the verifier never appears in a URL.
@@ -44,8 +46,9 @@ public struct SignIn: Sendable {
             verifier: verifier,
             redirectURI: Self.redirectURI
         )
-        try store.save(grant)
-        return grant
+        // The identity only labels the account; a failed lookup still keeps the sign-in.
+        let profile = try? await oauth.profile(accessToken: grant.accessToken)
+        return try await tokens.add(grant: grant, profile: profile)
     }
 }
 

@@ -60,18 +60,39 @@ public struct UsageClient: Sendable {
         self.session = session
     }
 
-    public func fetch() async throws -> UsageSnapshot {
-        do {
-            return try await fetch(forceRenewal: false)
-        } catch UsageError.unauthorized {
-            // The stored expiry can lag reality (revocation, clock skew). Renew
-            // the app's own grant, then try once more.
-            return try await fetch(forceRenewal: true)
+    /// Usage for every signed-in account, fetched in parallel. One account
+    /// failing never hides the others.
+    public func fetchAll() async throws -> [AccountUsage] {
+        let accounts = try await tokens.accounts()
+        guard !accounts.isEmpty else { throw TokenError.signInRequired }
+        return await withTaskGroup(of: (Int, AccountUsage).self) { group in
+            for (index, account) in accounts.enumerated() {
+                group.addTask {
+                    do {
+                        return (index, AccountUsage(account: account, result: .success(try await fetch(account: account.key))))
+                    } catch {
+                        return (index, AccountUsage(account: account, result: .failure(Self.message(for: error))))
+                    }
+                }
+            }
+            var results: [(Int, AccountUsage)] = []
+            for await result in group { results.append(result) }
+            return results.sorted { $0.0 < $1.0 }.map(\.1)
         }
     }
 
-    private func fetch(forceRenewal: Bool) async throws -> UsageSnapshot {
-        let token = try await tokens.accessToken(forceRenewal: forceRenewal)
+    public func fetch(account key: String) async throws -> UsageSnapshot {
+        do {
+            return try await fetch(account: key, forceRenewal: false)
+        } catch UsageError.unauthorized {
+            // The stored expiry can lag reality (revocation, clock skew). Renew
+            // the grant, then try once more.
+            return try await fetch(account: key, forceRenewal: true)
+        }
+    }
+
+    private func fetch(account key: String, forceRenewal: Bool) async throws -> UsageSnapshot {
+        let token = try await tokens.accessToken(for: key, forceRenewal: forceRenewal)
 
         var request = URLRequest(url: Self.endpoint)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

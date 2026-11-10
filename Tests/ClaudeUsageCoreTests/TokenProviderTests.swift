@@ -2,128 +2,177 @@ import Foundation
 import Testing
 @testable import ClaudeUsageCore
 
-/// Claude Code's item, read-only. Counts reads; it has no write path to count.
-private final class FakeClaudeCode: CredentialStore, @unchecked Sendable {
-    var credentials: OAuthCredentials?
-    private(set) var loadCount = 0
+/// Fakes are hit from concurrent tasks, so every access holds a lock.
+private final class FakeAccounts: AccountStoring, @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [Account]
 
-    init(expiresIn seconds: TimeInterval?, accessToken: String = "borrowed") {
-        credentials = seconds.map { OAuthCredentials(accessToken: accessToken, expiresAt: Date().addingTimeInterval($0)) }
-    }
+    init(_ accounts: [Account] = []) { stored = accounts }
 
-    func load() throws -> OAuthCredentials {
-        loadCount += 1
-        guard let credentials else { throw CredentialsError.notFound }
-        return credentials
+    var accounts: [Account] { lock.withLock { stored } }
+
+    func list() throws -> [Account] { lock.withLock { stored.sorted { $0.addedAt < $1.addedAt } } }
+    func save(_ account: Account) throws {
+        lock.withLock {
+            stored.removeAll { $0.key == account.key }
+            stored.append(account)
+        }
     }
+    func remove(key: String) throws { lock.withLock { stored.removeAll { $0.key == key } } }
 }
 
-private final class FakeGrants: AppGrantStoring, @unchecked Sendable {
-    var grant: AppGrant?
-    private(set) var saveCount = 0
+private final class FakeOAuth: GrantRefreshing, ProfileLooking, @unchecked Sendable {
+    private let lock = NSLock()
+    private var spent: [String] = []
+    let rejected: Set<String>
+    let owners: [String: String]
 
-    init(_ grant: AppGrant? = nil) { self.grant = grant }
+    init(rejected: Set<String> = [], owners: [String: String] = [:]) {
+        self.rejected = rejected
+        self.owners = owners
+    }
 
-    func load() throws -> AppGrant? { grant }
-    func save(_ grant: AppGrant) throws { saveCount += 1; self.grant = grant }
-    func clear() throws { grant = nil }
-}
-
-private final class FakeRefresher: GrantRefreshing, @unchecked Sendable {
-    private(set) var refreshed: [String] = []
-    var reject = false
+    var refreshed: [String] { lock.withLock { spent } }
 
     func refresh(_ grant: AppGrant) async throws -> AppGrant {
-        refreshed.append(grant.refreshToken)
+        lock.withLock { spent.append(grant.refreshToken) }
         try await Task.sleep(for: .milliseconds(20))
-        if reject { throw OAuthError.grantRejected }
-        return AppGrant(accessToken: "renewed", refreshToken: "rotated", expiresAt: Date().addingTimeInterval(3600))
+        if rejected.contains(grant.refreshToken) { throw OAuthError.grantRejected }
+        return AppGrant(accessToken: "\(grant.accessToken)+", refreshToken: "\(grant.refreshToken)+", expiresAt: Date().addingTimeInterval(3600))
+    }
+
+    func profile(accessToken: String) async throws -> AccountProfile {
+        guard let email = owners[accessToken] else { throw OAuthError.requestFailed(status: 401) }
+        return AccountProfile(email: email, organization: "Org")
     }
 }
 
-private func grant(expiresIn seconds: TimeInterval) -> AppGrant {
-    AppGrant(accessToken: "own", refreshToken: "own-refresh", expiresAt: Date().addingTimeInterval(seconds))
-}
-
-@Test func usesTheOwnGrantWithoutTouchingClaudeCode() async throws {
-    let claude = FakeClaudeCode(expiresIn: 3600)
-    let refresher = FakeRefresher()
-    let provider = TokenProvider(claudeCode: claude, grants: FakeGrants(grant(expiresIn: 3600)), refresher: refresher)
-
-    #expect(try await provider.accessToken() == "own")
-    #expect(claude.loadCount == 0)
-    #expect(refresher.refreshed.isEmpty)
-}
-
-@Test func renewsTheOwnGrantWhenItExpiresAndSavesTheRotatedToken() async throws {
-    let grants = FakeGrants(grant(expiresIn: -10))
-    let refresher = FakeRefresher()
-    let provider = TokenProvider(claudeCode: FakeClaudeCode(expiresIn: nil), grants: grants, refresher: refresher)
-
-    #expect(try await provider.accessToken() == "renewed")
-    #expect(refresher.refreshed == ["own-refresh"])
-    #expect(grants.grant?.refreshToken == "rotated")
-}
-
-@Test func concurrentCallersShareOneRenewal() async throws {
-    // A single-use refresh token must be spent exactly once.
-    let grants = FakeGrants(grant(expiresIn: -10))
-    let refresher = FakeRefresher()
-    let provider = TokenProvider(claudeCode: FakeClaudeCode(expiresIn: nil), grants: grants, refresher: refresher)
-
-    async let a = provider.accessToken()
-    async let b = provider.accessToken()
-    async let c = provider.accessToken(forceRenewal: true)
-    _ = try await (a, b, c)
-    #expect(refresher.refreshed == ["own-refresh"])
-    #expect(grants.saveCount == 1)
-}
-
-@Test func borrowsClaudeCodesTokenOnlyWhileItIsValid() async throws {
-    let refresher = FakeRefresher()
-    let provider = TokenProvider(claudeCode: FakeClaudeCode(expiresIn: 3600), grants: FakeGrants(), refresher: refresher)
-    #expect(try await provider.accessToken() == "borrowed")
-    #expect(refresher.refreshed.isEmpty)
-}
-
-@Test func expiredClaudeCodeTokenAsksForSignInAndIsNeverRenewed() async {
-    let refresher = FakeRefresher()
-    let provider = TokenProvider(claudeCode: FakeClaudeCode(expiresIn: -10), grants: FakeGrants(), refresher: refresher)
-
-    await #expect(throws: TokenError.signInRequired) {
-        _ = try await provider.accessToken()
-    }
-    await #expect(throws: TokenError.signInRequired) {
-        _ = try await provider.accessToken(forceRenewal: true)
-    }
-    // The only refresher in the app was never called for Claude Code's login.
-    #expect(refresher.refreshed.isEmpty)
-}
-
-@Test func rejectedOwnGrantFallsBackToAValidBorrowedToken() async throws {
-    let refresher = FakeRefresher()
-    refresher.reject = true
-    let provider = TokenProvider(
-        claudeCode: FakeClaudeCode(expiresIn: 3600),
-        grants: FakeGrants(grant(expiresIn: -10)),
-        refresher: refresher
+private func account(_ key: String, email: String? = nil, expiresIn: TimeInterval = 3600, signInEndsIn: TimeInterval? = nil, order: TimeInterval = 0) -> Account {
+    Account(
+        key: key,
+        email: email,
+        organization: nil,
+        grant: AppGrant(
+            accessToken: "\(key)-at",
+            refreshToken: "\(key)-rt",
+            expiresAt: Date().addingTimeInterval(expiresIn),
+            refreshExpiresAt: signInEndsIn.map { Date().addingTimeInterval($0) }
+        ),
+        addedAt: Date(timeIntervalSince1970: order)
     )
-    #expect(try await provider.accessToken() == "borrowed")
 }
 
-@Test func parsesATokenResponseAndKeepsTheOldRefreshTokenIfNoneIsReturned() throws {
+@Test func renewsOnlyTheExpiredAccountAndKeepsEachRenewalSeparate() async throws {
+    let store = FakeAccounts([account("a", expiresIn: -10, order: 1), account("b", order: 2), account("c", expiresIn: -10, order: 3)])
+    let oauth = FakeOAuth()
+    let provider = TokenProvider(store: store, refresher: oauth, profiles: oauth)
+
+    // Concurrent callers on one account share one renewal: a single-use
+    // refresh token must be spent exactly once.
+    async let a1 = provider.accessToken(for: "a")
+    async let a2 = provider.accessToken(for: "a", forceRenewal: true)
+    async let b = provider.accessToken(for: "b")
+    async let c = provider.accessToken(for: "c")
+    let tokens = try await [a1, a2, b, c]
+
+    #expect(tokens == ["a-at+", "a-at+", "b-at", "c-at+"])
+    #expect(oauth.refreshed.sorted() == ["a-rt", "c-rt"])
+    #expect(store.accounts.first { $0.key == "a" }?.grant.refreshToken == "a-rt+")
+}
+
+@Test func anExpiredSignInAsksForThatAccountOnlyAndIsNotSpent() async throws {
+    let store = FakeAccounts([
+        account("old", email: "old@example.com", expiresIn: -10, signInEndsIn: -1, order: 1),
+        account("rejected", email: "gone@example.com", expiresIn: -10, order: 2),
+    ])
+    let oauth = FakeOAuth(rejected: ["rejected-rt"])
+    let provider = TokenProvider(store: store, refresher: oauth, profiles: oauth)
+
+    await #expect(throws: TokenError.signInExpired(email: "old@example.com")) {
+        _ = try await provider.accessToken(for: "old")
+    }
+    await #expect(throws: TokenError.signInExpired(email: "gone@example.com")) {
+        _ = try await provider.accessToken(for: "rejected")
+    }
+    #expect(oauth.refreshed == ["rejected-rt"], "a sign-in past its end is not sent to the server")
+    #expect(store.accounts.count == 2, "a failed account is kept so it can be signed in again")
+}
+
+@Test func signingInAgainReplacesTheSameAccountAndSupersedesTheLegacyGrant() async throws {
+    // An unlabeled grant from an older version, owned by me@example.com.
+    let legacy = account("halp", order: 1)
+    let store = FakeAccounts([legacy])
+    let oauth = FakeOAuth(owners: ["halp-at": "me@example.com"])
+    let provider = TokenProvider(store: store, refresher: oauth, profiles: oauth)
+    let fresh = AppGrant(accessToken: "new-at", refreshToken: "new-rt", expiresAt: Date().addingTimeInterval(3600))
+
+    try await provider.add(grant: fresh, profile: AccountProfile(email: "Me@Example.com", organization: "Org"))
+    #expect(store.accounts.map(\.key) == ["Me@Example.com"], "the legacy grant for the same login is gone")
+
+    let second = AppGrant(accessToken: "x-at", refreshToken: "x-rt", expiresAt: Date().addingTimeInterval(3600))
+    try await provider.add(grant: second, profile: AccountProfile(email: "other@example.com", organization: "Org"))
+    let again = AppGrant(accessToken: "y-at", refreshToken: "y-rt", expiresAt: Date().addingTimeInterval(3600))
+    try await provider.add(grant: again, profile: AccountProfile(email: "me@example.com", organization: "Org"))
+
+    #expect(store.accounts.count == 2)
+    #expect(store.accounts.first { $0.key == "Me@Example.com" }?.grant.refreshToken == "y-rt")
+}
+
+@Test func unlabeledGrantsGetTheirEmail() async throws {
+    let store = FakeAccounts([account("halp", order: 1)])
+    let oauth = FakeOAuth(owners: ["halp-at": "me@example.com"])
+    let provider = TokenProvider(store: store, refresher: oauth, profiles: oauth)
+
+    await provider.identifyUnlabeled()
+    #expect(store.accounts.first?.email == "me@example.com")
+}
+
+@Test func parsesATokenResponseWithItsSignInLifetime() throws {
     let now = Date(timeIntervalSince1970: 1_000_000)
     let rotated = try ClaudeOAuth.parseGrant(
-        Data(#"{"access_token":"a","refresh_token":"r2","expires_in":28800}"#.utf8),
+        Data(#"{"access_token":"a","refresh_token":"r2","expires_in":28800,"refresh_token_expires_in":2592000}"#.utf8),
         previousRefreshToken: "r1", now: now
     )
-    #expect(rotated == AppGrant(accessToken: "a", refreshToken: "r2", expiresAt: now.addingTimeInterval(28800)))
+    #expect(rotated == AppGrant(
+        accessToken: "a", refreshToken: "r2",
+        expiresAt: now.addingTimeInterval(28800), refreshExpiresAt: now.addingTimeInterval(2_592_000)
+    ))
 
-    let kept = try ClaudeOAuth.parseGrant(
-        Data(#"{"access_token":"a","expires_in":60}"#.utf8),
-        previousRefreshToken: "r1", now: now
-    )
+    let kept = try ClaudeOAuth.parseGrant(Data(#"{"access_token":"a","expires_in":60}"#.utf8), previousRefreshToken: "r1", now: now)
     #expect(kept.refreshToken == "r1")
+    #expect(kept.refreshExpiresAt == nil)
+}
+
+@Test func readsTheLegacySingleGrantItemAsAnAccount() throws {
+    let legacy = try JSONEncoder().encode(AppGrant(accessToken: "a", refreshToken: "r", expiresAt: Date(timeIntervalSince1970: 0)))
+    let decoded = try KeychainAccountStore.decode(legacy, key: "halp")
+    #expect(decoded.key == "halp")
+    #expect(decoded.email == nil)
+    #expect(decoded.grant.refreshToken == "r")
+}
+
+@Test func findsEveryAccountItemInAKeychainDump() {
+    let dump = """
+    keychain: "/Users/test/Library/Keychains/login.keychain-db"
+    version: 512
+    class: "genp"
+    attributes:
+        "acct"<blob>="me@example.com"
+        "svce"<blob>="com.claudeusage.oauth"
+    keychain: "/Users/test/Library/Keychains/login.keychain-db"
+    version: 512
+    class: "genp"
+    attributes:
+        "acct"<blob>="halp"
+        "svce"<blob>="Claude Code-credentials"
+    keychain: "/Users/test/Library/Keychains/login.keychain-db"
+    version: 512
+    class: "genp"
+    attributes:
+        "acct"<blob>="halp"
+        "svce"<blob>="com.claudeusage.oauth"
+    """
+    #expect(KeychainAccountStore.accountNames(inDump: dump, service: "com.claudeusage.oauth") == ["me@example.com", "halp"])
 }
 
 @Test func pkceChallengeIsBase64URLSHA256() {

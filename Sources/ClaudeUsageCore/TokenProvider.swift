@@ -1,101 +1,137 @@
 import Foundation
 
-/// Hands out an access token for `/api/oauth/usage`.
+/// Hands out access tokens for the app's signed-in accounts and keeps each
+/// account's grant renewed.
 ///
-/// There are two sources, and they are kept strictly apart:
-///
-/// 1. **This app's own grant** (`AppGrant`), created by the in-app browser
-///    sign-in. The app renews it on its own, indefinitely, the same way DSH
-///    does. Claude Code never holds a copy, so renewing it cannot log Claude
-///    Code out.
-/// 2. **Claude Code's credential**, read-only, used only until the app has its
-///    own grant. Its refresh token is never sent anywhere: refresh tokens are
-///    single-use, and rotating Claude Code's once logged Claude Code out into a
-///    `/login` loop. When its access token expires and the app has no grant of
-///    its own, the user is asked to sign in.
+/// Every grant comes from the app's own browser sign-in, so the app is the only
+/// holder of each refresh token and can renew it freely. Claude Code is never
+/// read or touched.
 public actor TokenProvider {
-    private let claudeCode: CredentialStore
-    private let grants: AppGrantStoring
+    private let store: AccountStoring
     private let refresher: GrantRefreshing
+    private let profiles: ProfileLooking
 
-    /// One renewal at a time. Refresh tokens are single-use, so two overlapping
-    /// renewals would have the second spend an already-rotated token.
-    private var renewal: Task<AppGrant, Error>?
+    /// One renewal per account at a time. Refresh tokens are single-use, so two
+    /// overlapping renewals would have the second spend an already-rotated token.
+    private var renewals: [String: Task<AppGrant, Error>] = [:]
 
     public init(
-        claudeCode: CredentialStore = KeychainCredentialStore(),
-        grants: AppGrantStoring = KeychainAppGrantStore(),
-        refresher: GrantRefreshing = ClaudeOAuth()
+        store: AccountStoring = KeychainAccountStore(),
+        refresher: GrantRefreshing = ClaudeOAuth(),
+        profiles: ProfileLooking = ClaudeOAuth()
     ) {
-        self.claudeCode = claudeCode
-        self.grants = grants
+        self.store = store
         self.refresher = refresher
+        self.profiles = profiles
     }
 
-    /// - Parameter forceRenewal: renew the app's grant even if its expiry still
-    ///   looks valid, used to recover from a 401 the timestamp missed.
-    public func accessToken(forceRenewal: Bool = false) async throws -> String {
-        if let grant = try grants.load() {
-            if !forceRenewal, !grant.needsRefresh() {
-                return grant.accessToken
+    public func accounts() throws -> [Account] {
+        try store.list()
+    }
+
+    /// - Parameter forceRenewal: renew even if the expiry still looks valid,
+    ///   used to recover from a 401 the timestamp missed.
+    public func accessToken(for key: String, forceRenewal: Bool = false) async throws -> String {
+        guard let account = try store.list().first(where: { $0.key == key }) else {
+            throw TokenError.signInRequired
+        }
+        if !forceRenewal, !account.grant.needsRefresh() {
+            return account.grant.accessToken
+        }
+        return try await renew(account).accessToken
+    }
+
+    /// Stores a fresh sign-in. Signing in again to an account already listed
+    /// replaces its grant, so the same account never appears twice.
+    @discardableResult
+    public func add(grant: AppGrant, profile: AccountProfile?) async throws -> Account {
+        let existing = try store.list()
+        if let profile, let match = existing.first(where: { $0.email?.lowercased() == profile.email.lowercased() }) {
+            var updated = match
+            updated.grant = grant
+            updated.organization = profile.organization ?? match.organization
+            try store.save(updated)
+            return updated
+        }
+        let key = profile?.email ?? "account-\(UUID().uuidString.prefix(8).lowercased())"
+        let account = Account(key: key, email: profile?.email, organization: profile?.organization, grant: grant)
+        try store.save(account)
+        // Older versions kept one unlabeled grant under the login user name.
+        // A sign-in to that same login supersedes it.
+        if let profile {
+            for legacy in existing where legacy.email == nil {
+                if let owner = try? await profiles.profile(accessToken: accessToken(for: legacy.key)),
+                   owner.email.lowercased() == profile.email.lowercased() {
+                    try store.remove(key: legacy.key)
+                }
             }
+        }
+        return account
+    }
+
+    /// Labels accounts saved without an email (older versions). Best effort:
+    /// an account that cannot be reached stays unlabeled until next time.
+    public func identifyUnlabeled() async {
+        for account in (try? store.list()) ?? [] where account.email == nil {
+            guard let token = try? await accessToken(for: account.key),
+                  let profile = try? await profiles.profile(accessToken: token),
+                  var current = try? store.list().first(where: { $0.key == account.key })
+            else { continue }
+            current.email = profile.email
+            current.organization = profile.organization
+            try? store.save(current)
+        }
+    }
+
+    public func remove(key: String) throws {
+        try store.remove(key: key)
+    }
+
+    private func renew(_ account: Account) async throws -> AppGrant {
+        if let pending = renewals[account.key] {
+            return try await pending.value
+        }
+        let key = account.key
+        let task = Task { [store, refresher] () throws -> AppGrant in
+            if account.grant.signInExpired() { throw TokenError.signInExpired(email: account.email) }
             do {
-                return try await renew(grant).accessToken
-            } catch TokenError.signInRequired {
-                // Our grant is dead; Claude Code's token may still serve.
-            }
-        }
-
-        // No grant of our own yet: borrow Claude Code's token while it is
-        // valid. Read-only, and never renewed from here.
-        let borrowed = try claudeCode.load()
-        if !forceRenewal, !borrowed.needsRefresh() {
-            return borrowed.accessToken
-        }
-        throw TokenError.signInRequired
-    }
-
-    /// Whether the app has its own grant, i.e. keeps working without Claude Code.
-    public func hasOwnGrant() -> Bool {
-        (try? grants.load()) != nil
-    }
-
-    /// Forgets the app's own grant. Claude Code's credential is untouched.
-    public func signOut() throws {
-        try grants.clear()
-    }
-
-    private func renew(_ grant: AppGrant) async throws -> AppGrant {
-        if let renewal {
-            return try await renewal.value
-        }
-        let task = Task { [grants, refresher] () throws -> AppGrant in
-            do {
-                let renewed = try await refresher.refresh(grant)
-                try grants.save(renewed)
-                return renewed
+                let renewed = try await refresher.refresh(account.grant)
+                var updated = account
+                // Older responses omit the refresh lifetime; keep the known one.
+                updated.grant = AppGrant(
+                    accessToken: renewed.accessToken,
+                    refreshToken: renewed.refreshToken,
+                    expiresAt: renewed.expiresAt,
+                    refreshExpiresAt: renewed.refreshExpiresAt ?? account.grant.refreshExpiresAt
+                )
+                try store.save(updated)
+                return updated.grant
             } catch OAuthError.grantRejected {
                 // Another process (say, `--probe`) may have rotated the grant
                 // first. If the stored grant changed, it is the live one.
-                if let current = try grants.load(), current.refreshToken != grant.refreshToken {
-                    return current
+                if let current = try store.list().first(where: { $0.key == key }),
+                   current.grant.refreshToken != account.grant.refreshToken {
+                    return current.grant
                 }
-                throw TokenError.signInRequired
+                throw TokenError.signInExpired(email: account.email)
             }
         }
-        renewal = task
-        defer { renewal = nil }
+        renewals[key] = task
+        defer { renewals[key] = nil }
         return try await task.value
     }
 }
 
 public enum TokenError: Error, LocalizedError, Equatable {
     case signInRequired
+    case signInExpired(email: String?)
 
     public var errorDescription: String? {
         switch self {
         case .signInRequired:
-            return "Sign in to keep usage updating on its own."
+            return "Sign in to see usage."
+        case .signInExpired(let email):
+            return "Sign-in for \(email ?? "this account") expired. Sign in again."
         }
     }
 }

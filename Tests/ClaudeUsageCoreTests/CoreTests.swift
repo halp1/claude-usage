@@ -2,52 +2,6 @@ import Foundation
 import Testing
 @testable import ClaudeUsageCore
 
-// MARK: - Credentials
-
-/// Mirrors the real keychain blob, including sibling keys we must not disturb.
-private let sampleCredentialJSON = """
-{
-  "claudeAiOauth": {
-    "accessToken": "access-1",
-    "refreshToken": "refresh-1",
-    "expiresAt": 1789017599542,
-    "refreshTokenExpiresAt": 1790000000000,
-    "scopes": ["user:inference", "user:profile"],
-    "subscriptionType": "team",
-    "rateLimitTier": "default_raven"
-  },
-  "someOtherKey": {"nested": true}
-}
-"""
-
-@Test func parsesNestedCredentials() throws {
-    let credentials = try OAuthCredentials(json: Data(sampleCredentialJSON.utf8))
-    #expect(credentials.accessToken == "access-1")
-    #expect(credentials.expiresAt == Date(timeIntervalSince1970: 1789017599.542))
-}
-
-@Test func acceptsFlatCredentialsWithoutTheOAuthWrapper() throws {
-    let flat = #"{"accessToken":"a","refreshToken":"r","expiresAt":1789017599542}"#
-    #expect(try OAuthCredentials(json: Data(flat.utf8)).accessToken == "a")
-}
-
-@Test func rejectsBlobWithoutTokens() {
-    #expect(throws: CredentialsError.self) {
-        try OAuthCredentials(json: Data(#"{"claudeAiOauth":{"scopes":[]}}"#.utf8))
-    }
-}
-
-@Test func refreshIsDueOnlyInsideTheLeeway() {
-    let now = Date()
-    func credentials(expiringIn seconds: TimeInterval) -> OAuthCredentials {
-        OAuthCredentials(accessToken: "a", expiresAt: now.addingTimeInterval(seconds))
-    }
-    #expect(credentials(expiringIn: 3600).needsRefresh(now: now) == false)
-    #expect(credentials(expiringIn: 61).needsRefresh(now: now) == false)
-    #expect(credentials(expiringIn: 30).needsRefresh(now: now) == true)
-    #expect(credentials(expiringIn: -1).needsRefresh(now: now) == true)
-}
-
 // MARK: - Usage payload
 
 /// Trimmed from a real response, keeping the null-heavy experiment keys.
@@ -159,4 +113,32 @@ func severityThresholdsAreSeventyFiveAndNinety(percent: Double, expected: Severi
     #expect(Format.staleness(since: now.addingTimeInterval(-4 * 60), now: now) == "updated 4m ago")
     #expect(Format.staleness(since: now.addingTimeInterval(-2 * 3600), now: now) == "updated 2h ago")
     #expect(Format.staleness(since: now.addingTimeInterval(-3 * 86400), now: now) == "updated 3d ago")
+}
+
+// MARK: - Combining accounts
+
+@Test func combinesAccountsAsOnePool() throws {
+    let soon = Date(timeIntervalSince1970: 1_000)
+    let later = Date(timeIntervalSince1970: 9_000)
+    let a = UsageSnapshot(
+        fiveHour: LimitWindow(percent: 50, resetsAt: later),
+        weekly: LimitWindow(percent: 20, resetsAt: later),
+        credits: CreditsInfo(used: 10, limit: 100),
+        fetchedAt: later
+    )
+    let b = UsageSnapshot(
+        fiveHour: LimitWindow(percent: 10, resetsAt: soon),
+        weekly: nil,
+        credits: CreditsInfo(used: 5, limit: nil),
+        fetchedAt: soon
+    )
+    let combined = try #require(UsageSnapshot.combined([a, b]))
+
+    #expect(combined.fiveHour == LimitWindow(percent: 30, resetsAt: soon), "average share, soonest reset")
+    #expect(combined.weekly == LimitWindow(percent: 10, resetsAt: later), "a missing window is unused capacity")
+    #expect(combined.credits == CreditsInfo(used: 15, limit: nil), "one uncapped account leaves the pool uncapped")
+    #expect(combined.fetchedAt == soon, "staleness follows the oldest fetch")
+
+    #expect(UsageSnapshot.combined([a]) == a)
+    #expect(UsageSnapshot.combined([]) == nil)
 }

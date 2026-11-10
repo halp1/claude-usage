@@ -9,9 +9,8 @@ import Testing
 /// which logs the user out and puts `/login` into a loop that only deleting the
 /// keychain item breaks.
 ///
-/// The app may renew only its own grant (`AppGrant`, created by its own browser
-/// sign-in and stored under a different keychain service). These tests fail if
-/// a change could let Claude Code's grant be written or renewed.
+/// The app renews only grants from its own browser sign-in. These tests fail if
+/// a change could let Claude Code's grant be read, written, or renewed.
 
 private let sourcesRoot: URL = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent()
@@ -37,8 +36,7 @@ private func sources() throws -> [(name: String, text: String)] {
 }
 
 @Test func tokenExchangeLivesOnlyInTheAppGrantClient() throws {
-    // `ClaudeOAuth` only accepts an `AppGrant`, which is never built from
-    // Claude Code's item. Keep every token exchange in that one file.
+    // Keep every token exchange in the one file that handles the app's own grants.
     for (name, text) in try sources() where name != "ClaudeOAuth.swift" {
         for token in ["grant_type", "refresh_token", "oauth/token"] {
             #expect(!text.contains(token), "\(name) contains \(token); token exchange belongs in ClaudeOAuth.swift only")
@@ -46,27 +44,11 @@ private func sources() throws -> [(name: String, text: String)] {
     }
 }
 
-@Test func claudeCodesItemIsOnlyEverRead() throws {
+@Test func neverTouchesClaudeCodesLogin() throws {
+    // The app signs in on its own. Reading Claude Code's item once tied the
+    // app to Claude Code's sign-in, and renewing it logged Claude Code out.
     for (name, text) in try sources() {
-        if name == "Credentials.swift" {
-            // The reader must not pull the refresh token out at all.
-            #expect(!text.contains("[\"refreshToken\"]"), "Credentials.swift reads Claude Code's refresh token")
-            #expect(!text.contains("add-generic-password") && !text.contains("delete-generic-password"))
-        } else {
-            #expect(!text.contains("Claude Code-credentials"), "\(name) names Claude Code's keychain item")
-            #expect(!text.contains("OAuthCredentials.service"), "\(name) addresses Claude Code's keychain item")
-        }
+        #expect(!text.contains("Claude Code-credentials"), "\(name) names Claude Code's keychain item")
+        #expect(!text.contains("claudeAiOauth"), "\(name) parses Claude Code's credential blob")
     }
-}
-
-@Test func appGrantUsesItsOwnKeychainItem() {
-    #expect(KeychainAppGrantStore.service != OAuthCredentials.service)
-}
-
-@Test func claudeCodeCredentialsCarryNoRefreshToken() throws {
-    let blob = #"{"claudeAiOauth":{"accessToken":"a","refreshToken":"SECRET","expiresAt":1789017599542}}"#
-    let credentials = try OAuthCredentials(json: Data(blob.utf8))
-    let labels = Mirror(reflecting: credentials).children.compactMap(\.label)
-    #expect(labels.sorted() == ["accessToken", "expiresAt"])
-    #expect(!String(describing: credentials).contains("SECRET"))
 }

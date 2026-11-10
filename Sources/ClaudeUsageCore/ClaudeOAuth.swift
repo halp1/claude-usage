@@ -7,6 +7,11 @@ public protocol GrantRefreshing: Sendable {
     func refresh(_ grant: AppGrant) async throws -> AppGrant
 }
 
+/// Looks up who a token belongs to. A protocol so tests can stand in for the network.
+public protocol ProfileLooking: Sendable {
+    func profile(accessToken: String) async throws -> AccountProfile
+}
+
 public enum OAuthError: Error, LocalizedError {
     /// The server refused the grant: revoked, expired, or already rotated.
     case grantRejected
@@ -32,7 +37,7 @@ public enum OAuthError: Error, LocalizedError {
 ///
 /// Only ever handles this app's own grant (`AppGrant`). It must never be handed
 /// Claude Code's credentials: refreshing those logs Claude Code out.
-public struct ClaudeOAuth: GrantRefreshing {
+public struct ClaudeOAuth: GrantRefreshing, ProfileLooking {
     static let clientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
     static let authorizeURL = URL(string: "https://claude.ai/oauth/authorize")!
     static let tokenURL = URL(string: "https://platform.claude.com/v1/oauth/token")!
@@ -109,9 +114,53 @@ public struct ClaudeOAuth: GrantRefreshing {
         guard let refresh = (object["refresh_token"] as? String) ?? previousRefreshToken, !refresh.isEmpty else {
             throw OAuthError.malformedResponse
         }
-        return AppGrant(accessToken: access, refreshToken: refresh, expiresAt: now.addingTimeInterval(expiresIn))
+        let refreshExpiresIn = (object["refresh_token_expires_in"] as? Double)
+            ?? (object["refresh_token_expires_in"] as? String).flatMap(Double.init)
+        return AppGrant(
+            accessToken: access,
+            refreshToken: refresh,
+            expiresAt: now.addingTimeInterval(expiresIn),
+            refreshExpiresAt: refreshExpiresIn.map { now.addingTimeInterval($0) }
+        )
+    }
+
+    /// Who an access token belongs to, so each sign-in becomes its own account.
+    public func profile(accessToken: String) async throws -> AccountProfile {
+        var request = URLRequest(url: Self.profileURL)
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(UsageClient.userAgent, forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 20
+        let (data, response) = try await session.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(status) else { throw OAuthError.requestFailed(status: status) }
+        return try Self.parseProfile(data)
+    }
+
+    static func parseProfile(_ data: Data) throws -> AccountProfile {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let account = object["account"] as? [String: Any],
+              let email = account["email"] as? String, !email.isEmpty
+        else { throw OAuthError.malformedResponse }
+        let organization = (object["organization"] as? [String: Any])?["name"] as? String
+        return AccountProfile(email: email, organization: organization)
     }
 }
+
+/// The identity behind a sign-in.
+public struct AccountProfile: Equatable, Sendable {
+    public let email: String
+    public let organization: String?
+
+    public init(email: String, organization: String?) {
+        self.email = email
+        self.organization = organization
+    }
+}
+
+extension ClaudeOAuth {
+    static let profileURL = URL(string: "https://api.anthropic.com/api/oauth/profile")!
+}
+
 
 /// RFC 7636 proof key helpers.
 enum PKCE {
